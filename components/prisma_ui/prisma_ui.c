@@ -5,29 +5,23 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "prisma_app.h"
 #include "prisma_bsp.h"
 #include "prisma_network.h"
 #include "prisma_platform.h"
 
 #define SCREEN_W 240
-#define SCREEN_H 240
 
 static prisma_view_t s_view = PRISMA_VIEW_INTRO;
-static uint8_t s_file_index = 0;
-static uint8_t s_intensity = 61;
-static bool s_bypass = true;
-
-static bool s_effect_enabled[6] = {true, true, true, true, true, true};
-static uint8_t s_effect_value[6] = {50, 50, 50, 1, 50, 50};
+static uint32_t s_seen_revision = 0;
+static char s_seen_ip[16] = {0};
 
 static uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b)
 {
-    return (uint16_t)(((r & 0xF8U) << 8) |
-                      ((g & 0xFCU) << 3) |
-                      ((b & 0xF8U) >> 3));
+    return (uint16_t)(((r & 0xF8U) << 8) | ((g & 0xFCU) << 3) | ((b & 0xF8U) >> 3));
 }
 
-/* Eight-color fixed palette: matches the BSP cache limit. */
+/* Fixed eight-color palette: BSP caches eight immutable DMA color buffers. */
 static uint16_t c_bg(void)      { return rgb565(7, 8, 15); }
 static uint16_t c_panel(void)   { return rgb565(17, 29, 52); }
 static uint16_t c_text(void)    { return rgb565(244, 244, 242); }
@@ -59,7 +53,6 @@ static const uint8_t FONT[39][7] = {
     {0x00,0x00,0x00,0x1F,0x00,0x00,0x00},{0x00,0x04,0x04,0x00,0x04,0x04,0x00},
     {0x00,0x00,0x00,0x00,0x00,0x00,0x04},
 };
-
 static const uint8_t GLYPH_SLASH[7] = {0x01,0x02,0x02,0x04,0x08,0x08,0x10};
 static const uint8_t GLYPH_BLANK[7] = {0,0,0,0,0,0,0};
 
@@ -86,11 +79,8 @@ static void draw_char(int x, int y, char c, int scale, uint16_t color)
     for (int row = 0; row < 7; ++row) {
         for (int col = 0; col < 5; ++col) {
             if (rows[row] & (1U << (4 - col))) {
-                prisma_bsp_display_fill_rect((uint16_t)(x + col * scale),
-                                             (uint16_t)(y + row * scale),
-                                             (uint16_t)scale,
-                                             (uint16_t)scale,
-                                             color);
+                prisma_bsp_display_fill_rect((uint16_t)(x + col * scale), (uint16_t)(y + row * scale),
+                                             (uint16_t)scale, (uint16_t)scale, color);
             }
         }
     }
@@ -98,10 +88,7 @@ static void draw_char(int x, int y, char c, int scale, uint16_t color)
 
 static void draw_text(int x, int y, const char *text, int scale, uint16_t color)
 {
-    while (*text) {
-        draw_char(x, y, *text++, scale, color);
-        x += 6 * scale;
-    }
+    while (*text) { draw_char(x, y, *text++, scale, color); x += 6 * scale; }
 }
 
 static void draw_center(int y, const char *text, int scale, uint16_t color)
@@ -111,30 +98,25 @@ static void draw_center(int y, const char *text, int scale, uint16_t color)
 
 static void draw_brand(int y, int scale)
 {
-    const char *left = "PRISMA-";
-    int total = text_width("PRISMA-PI", scale);
-    int x = (SCREEN_W - total) / 2;
-    draw_text(x, y, left, scale, c_text());
-    x += 7 * 6 * scale;
-    draw_text(x, y, "P", scale, c_magenta());
-    x += 6 * scale;
+    int x = (SCREEN_W - text_width("PRISMA-PI", scale)) / 2;
+    draw_text(x, y, "PRISMA-", scale, c_text()); x += 7 * 6 * scale;
+    draw_text(x, y, "P", scale, c_magenta()); x += 6 * scale;
     draw_text(x, y, "I", scale, c_yellow());
 }
 
 static void draw_dots(void)
 {
-    int start = 92;
     for (int i = 0; i < 4; ++i) {
-        prisma_bsp_display_fill_rect((uint16_t)(start + i * 16), 226, 8, 8,
+        prisma_bsp_display_fill_rect((uint16_t)(92 + i * 16), 226, 8, 8,
                                      i == (int)s_view ? c_cyan() : c_muted());
     }
 }
 
 static void draw_bar(int x, int y, int w, int h, uint8_t value)
 {
-    prisma_bsp_display_fill_rect((uint16_t)x, (uint16_t)y, (uint16_t)w, (uint16_t)h, c_muted());
+    prisma_bsp_display_fill_rect(x, y, w, h, c_muted());
     int fill = (w * value) / 100;
-    if (fill > 0) prisma_bsp_display_fill_rect((uint16_t)x, (uint16_t)y, (uint16_t)fill, (uint16_t)h, c_cyan());
+    if (fill > 0) prisma_bsp_display_fill_rect(x, y, fill, h, c_cyan());
 }
 
 static void draw_on_badge(void)
@@ -153,26 +135,20 @@ static void draw_intro(void)
     draw_dots();
 }
 
-static const char *current_file(void)
-{
-    return s_file_index == 0 ? "F1 MOON.JPG" : "F2 TANGO.JPG";
-}
-
-static void draw_now_playing(void)
+static void draw_now_playing(const prisma_synth_state_t *st)
 {
     char value[8];
     prisma_bsp_display_fill(c_bg());
-    draw_brand(8, 2);
-    draw_on_badge();
+    draw_brand(8, 2); draw_on_badge();
     draw_text(10, 43, "NOW PLAYING", 1, c_cyan());
-    draw_text(10, 61, current_file(), 2, c_text());
+    draw_text(10, 61, st->file_name, 2, c_text());
     draw_text(10, 101, "INTENSITY", 2, c_text());
-    snprintf(value, sizeof(value), "%u", (unsigned)s_intensity);
+    snprintf(value, sizeof(value), "%u", (unsigned)st->intensity);
     draw_text(194, 101, value, 2, c_text());
-    draw_bar(10, 124, 220, 10, s_intensity);
+    draw_bar(10, 124, 220, 10, st->intensity);
     draw_text(10, 157, "MODE", 2, c_text());
     prisma_bsp_display_fill_rect(86, 148, 144, 42, c_panel());
-    draw_center(161, s_bypass ? "BYPASS" : "ACTIVE", 2, s_bypass ? c_cyan() : c_green());
+    draw_center(161, st->bypass ? "BYPASS" : "ACTIVE", 2, st->bypass ? c_cyan() : c_green());
     draw_dots();
 }
 
@@ -196,30 +172,26 @@ static const char *effect_name(int i)
     return names[i];
 }
 
-static void draw_core(void)
+static void draw_core(const prisma_synth_state_t *st)
 {
     char value[8];
     prisma_bsp_display_fill(c_bg());
-    draw_brand(5, 2);
-    draw_on_badge();
+    draw_brand(5, 2); draw_on_badge();
     draw_center(29, "CORE EXTENDED", 1, c_cyan());
 
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < PRISMA_EFFECT_COUNT; ++i) {
         int y = 48 + i * 27;
-        uint16_t label = s_effect_enabled[i] ? c_text() : c_muted();
-        prisma_bsp_display_fill_rect(8, (uint16_t)(y + 3), 7, 7,
-                                     s_effect_enabled[i] ? c_green() : c_muted());
-        draw_text(21, y, effect_name(i), 1, label);
-
-        if (i == 3) {
-            prisma_bsp_display_fill_rect(113, (uint16_t)(y - 4), 52, 20,
-                                         s_effect_enabled[i] ? c_cyan() : c_panel());
-            prisma_bsp_display_fill_rect(166, (uint16_t)(y - 4), 52, 20, c_panel());
-            draw_text(126, y, "ON", 1, s_effect_enabled[i] ? c_bg() : c_muted());
-            draw_text(179, y, "OFF", 1, s_effect_enabled[i] ? c_muted() : c_text());
+        bool enabled = st->effects[i].enabled;
+        prisma_bsp_display_fill_rect(8, y + 3, 7, 7, enabled ? c_green() : c_muted());
+        draw_text(21, y, effect_name(i), 1, enabled ? c_text() : c_muted());
+        if (i == PRISMA_EFFECT_MIRROR) {
+            prisma_bsp_display_fill_rect(113, y - 4, 52, 20, enabled ? c_cyan() : c_panel());
+            prisma_bsp_display_fill_rect(166, y - 4, 52, 20, c_panel());
+            draw_text(126, y, "ON", 1, enabled ? c_bg() : c_muted());
+            draw_text(179, y, "OFF", 1, enabled ? c_muted() : c_text());
         } else {
-            draw_bar(112, y + 2, 94, 8, s_effect_value[i]);
-            snprintf(value, sizeof(value), "%u", (unsigned)s_effect_value[i]);
+            draw_bar(112, y + 2, 94, 8, st->effects[i].value);
+            snprintf(value, sizeof(value), "%u", (unsigned)st->effects[i].value);
             draw_text(210, y, value, 1, c_text());
         }
     }
@@ -228,10 +200,12 @@ static void draw_core(void)
 
 static void render(void)
 {
+    prisma_synth_state_t st = prisma_app_get_state();
+    s_seen_revision = st.revision;
     switch (s_view) {
-        case PRISMA_VIEW_NOW_PLAYING: draw_now_playing(); break;
+        case PRISMA_VIEW_NOW_PLAYING: draw_now_playing(&st); break;
         case PRISMA_VIEW_BROWSER: draw_browser(); break;
-        case PRISMA_VIEW_CORE_EXTENDED: draw_core(); break;
+        case PRISMA_VIEW_CORE_EXTENDED: draw_core(&st); break;
         case PRISMA_VIEW_INTRO:
         default: draw_intro(); break;
     }
@@ -249,15 +223,15 @@ void prisma_ui_init(void)
 {
     prisma_settings_t settings = prisma_platform_get_settings();
     prisma_bsp_set_brightness(settings.brightness_percent);
-    s_view = PRISMA_VIEW_INTRO;
+    s_view = settings.last_view;
+    if (s_view < PRISMA_VIEW_INTRO || s_view > PRISMA_VIEW_CORE_EXTENDED) s_view = PRISMA_VIEW_INTRO;
     render();
 }
 
 void prisma_ui_handle_touch(uint16_t x, uint16_t y)
 {
-    if (y >= 210) {
-        if (x < 100 && s_view > PRISMA_VIEW_INTRO) set_view((prisma_view_t)(s_view - 1));
-        else if (x > 140 && s_view < PRISMA_VIEW_CORE_EXTENDED) set_view((prisma_view_t)(s_view + 1));
+    if (y >= 214) {
+        set_view((prisma_view_t)(x / 60));
         return;
     }
 
@@ -267,30 +241,23 @@ void prisma_ui_handle_touch(uint16_t x, uint16_t y)
     }
 
     if (s_view == PRISMA_VIEW_NOW_PLAYING) {
-        if (y >= 42 && y <= 90) {
-            s_file_index ^= 1U;
-        } else if (y >= 112 && y <= 143) {
-            int value = ((int)x - 10) * 100 / 220;
-            if (value < 0) value = 0;
-            if (value > 100) value = 100;
-            s_intensity = (uint8_t)value;
-        } else if (y >= 145 && y <= 198) {
-            s_bypass = !s_bypass;
-        }
+        if (y >= 40 && y < 92) prisma_app_cycle_file();
+        else if (y >= 110 && y < 145) prisma_app_set_intensity((uint8_t)((x * 100U) / 239U));
+        else if (y >= 145 && y < 200) prisma_app_toggle_bypass();
         render();
         return;
     }
 
-    if (s_view == PRISMA_VIEW_CORE_EXTENDED) {
-        int row = ((int)y - 44) / 27;
-        if (row >= 0 && row < 6) {
-            if (x < 108 || row == 3) {
-                s_effect_enabled[row] = !s_effect_enabled[row];
+    if (s_view == PRISMA_VIEW_CORE_EXTENDED && y >= 44 && y < 210) {
+        int row = (y - 44) / 27;
+        if (row >= 0 && row < PRISMA_EFFECT_COUNT) {
+            if (x < 108 || row == PRISMA_EFFECT_MIRROR) {
+                prisma_app_toggle_effect((prisma_effect_id_t)row);
             } else {
                 int value = ((int)x - 112) * 100 / 94;
                 if (value < 0) value = 0;
                 if (value > 100) value = 100;
-                s_effect_value[row] = (uint8_t)value;
+                prisma_app_set_effect_value((prisma_effect_id_t)row, (uint8_t)value);
             }
             render();
         }
@@ -299,5 +266,17 @@ void prisma_ui_handle_touch(uint16_t x, uint16_t y)
 
 void prisma_ui_tick(void)
 {
-    /* Web/app synchronization will hook into the shared state model in M4.2. */
+    prisma_synth_state_t st = prisma_app_get_state();
+    if (st.revision != s_seen_revision &&
+        (s_view == PRISMA_VIEW_NOW_PLAYING || s_view == PRISMA_VIEW_CORE_EXTENDED)) {
+        render();
+    }
+
+    if (s_view == PRISMA_VIEW_BROWSER) {
+        prisma_network_status_t net = prisma_network_get_status();
+        if (strncmp(s_seen_ip, net.ip, sizeof(s_seen_ip)) != 0) {
+            snprintf(s_seen_ip, sizeof(s_seen_ip), "%s", net.ip);
+            render();
+        }
+    }
 }
