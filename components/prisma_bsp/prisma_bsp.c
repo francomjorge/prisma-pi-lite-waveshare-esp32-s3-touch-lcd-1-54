@@ -27,8 +27,8 @@
 #define PRISMA_PIN_LCD_RST  GPIO_NUM_40
 #define PRISMA_PIN_LCD_BL   GPIO_NUM_46
 
-#define PRISMA_PIN_I2C_SDA  GPIO_NUM_42
-#define PRISMA_PIN_I2C_SCL  GPIO_NUM_41
+#define PRISMA_PIN_I2C_SDA   GPIO_NUM_42
+#define PRISMA_PIN_I2C_SCL   GPIO_NUM_41
 #define PRISMA_PIN_TOUCH_INT GPIO_NUM_48
 #define PRISMA_PIN_TOUCH_RST GPIO_NUM_47
 
@@ -42,6 +42,8 @@
 #define PRISMA_BL_FREQUENCY_HZ 5000
 
 #define PRISMA_FILL_ROWS 20
+#define PRISMA_COLOR_CACHE_SLOTS 8
+#define PRISMA_COLOR_BUFFER_PIXELS (PRISMA_LCD_H_RES * PRISMA_FILL_ROWS)
 
 static const char *TAG = "prisma_bsp";
 
@@ -52,8 +54,36 @@ static esp_lcd_touch_handle_t s_touch = NULL;
 static prisma_bsp_status_t s_status = {0};
 static bool s_initialized = false;
 
-/* Internal DRAM is kept alive for queued SPI DMA transfers. */
-static DMA_ATTR uint16_t s_fill_buffer[PRISMA_LCD_H_RES * PRISMA_FILL_ROWS];
+/*
+ * UI M2 uses a tiny fixed palette. Each cached DMA buffer is immutable after
+ * assignment, so queued SPI transfers never observe a buffer being recolored.
+ */
+static DMA_ATTR uint16_t s_color_buffers[PRISMA_COLOR_CACHE_SLOTS][PRISMA_COLOR_BUFFER_PIXELS];
+static bool s_color_used[PRISMA_COLOR_CACHE_SLOTS] = {0};
+static uint16_t s_color_values[PRISMA_COLOR_CACHE_SLOTS] = {0};
+
+static uint16_t *color_buffer(uint16_t rgb565)
+{
+    for (size_t slot = 0; slot < PRISMA_COLOR_CACHE_SLOTS; ++slot) {
+        if (s_color_used[slot] && s_color_values[slot] == rgb565) {
+            return s_color_buffers[slot];
+        }
+    }
+
+    for (size_t slot = 0; slot < PRISMA_COLOR_CACHE_SLOTS; ++slot) {
+        if (!s_color_used[slot]) {
+            for (size_t i = 0; i < PRISMA_COLOR_BUFFER_PIXELS; ++i) {
+                s_color_buffers[slot][i] = rgb565;
+            }
+            s_color_values[slot] = rgb565;
+            s_color_used[slot] = true;
+            return s_color_buffers[slot];
+        }
+    }
+
+    ESP_LOGE(TAG, "Display color cache exhausted");
+    return NULL;
+}
 
 static bool init_backlight(void)
 {
@@ -98,7 +128,7 @@ static bool init_display(void)
         .sclk_io_num = PRISMA_PIN_LCD_SCLK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
-        .max_transfer_sz = PRISMA_LCD_H_RES * PRISMA_FILL_ROWS * sizeof(uint16_t),
+        .max_transfer_sz = PRISMA_COLOR_BUFFER_PIXELS * sizeof(uint16_t),
     };
 
     esp_err_t err = spi_bus_initialize(PRISMA_LCD_SPI_HOST, &bus_cfg, SPI_DMA_CH_AUTO);
@@ -213,7 +243,7 @@ bool prisma_bsp_init(void)
     }
     s_initialized = true;
 
-    ESP_LOGI(TAG, "M1 board bring-up: Waveshare ESP32-S3-Touch-LCD-1.54");
+    ESP_LOGI(TAG, "Board bring-up: Waveshare ESP32-S3-Touch-LCD-1.54");
 
     if (!init_backlight()) {
         return false;
@@ -229,7 +259,6 @@ bool prisma_bsp_init(void)
     }
 
     s_status.touch_ready = init_touch();
-
     prisma_bsp_set_brightness(80);
 
     ESP_LOGI(TAG, "Display: %s", s_status.display_ready ? "ready" : "failed");
@@ -263,37 +292,60 @@ void prisma_bsp_set_brightness(uint8_t percent)
     s_status.brightness_percent = percent;
 }
 
-bool prisma_bsp_display_fill(uint16_t rgb565)
+bool prisma_bsp_display_fill_rect(uint16_t x,
+                                  uint16_t y,
+                                  uint16_t width,
+                                  uint16_t height,
+                                  uint16_t rgb565)
 {
-    if (!s_status.display_ready || s_lcd_panel == NULL) {
+    if (!s_status.display_ready || s_lcd_panel == NULL || width == 0 || height == 0) {
         return false;
     }
 
-    for (size_t i = 0; i < (sizeof(s_fill_buffer) / sizeof(s_fill_buffer[0])); ++i) {
-        s_fill_buffer[i] = rgb565;
+    if (x >= PRISMA_LCD_H_RES || y >= PRISMA_LCD_V_RES) {
+        return false;
     }
 
-    for (int y = 0; y < PRISMA_LCD_V_RES; y += PRISMA_FILL_ROWS) {
-        int y_end = y + PRISMA_FILL_ROWS;
-        if (y_end > PRISMA_LCD_V_RES) {
-            y_end = PRISMA_LCD_V_RES;
+    uint32_t x_end = (uint32_t)x + width;
+    uint32_t y_end = (uint32_t)y + height;
+    if (x_end > PRISMA_LCD_H_RES) {
+        x_end = PRISMA_LCD_H_RES;
+    }
+    if (y_end > PRISMA_LCD_V_RES) {
+        y_end = PRISMA_LCD_V_RES;
+    }
+
+    uint16_t *buffer = color_buffer(rgb565);
+    if (buffer == NULL) {
+        return false;
+    }
+
+    for (uint32_t row = y; row < y_end; row += PRISMA_FILL_ROWS) {
+        uint32_t row_end = row + PRISMA_FILL_ROWS;
+        if (row_end > y_end) {
+            row_end = y_end;
         }
 
         esp_err_t err = esp_lcd_panel_draw_bitmap(
             s_lcd_panel,
-            0,
-            y,
-            PRISMA_LCD_H_RES,
-            y_end,
-            s_fill_buffer);
+            x,
+            row,
+            x_end,
+            row_end,
+            buffer);
 
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "LCD fill failed at y=%d: %s", y, esp_err_to_name(err));
+            ESP_LOGE(TAG, "LCD rect failed at y=%lu: %s", (unsigned long)row, esp_err_to_name(err));
             return false;
         }
     }
 
     return true;
+}
+
+bool prisma_bsp_display_fill(uint16_t rgb565)
+{
+    return prisma_bsp_display_fill_rect(0, 0, PRISMA_LCD_H_RES, PRISMA_LCD_V_RES, rgb565);
 }
 
 bool prisma_bsp_touch_read(prisma_bsp_touch_sample_t *sample)

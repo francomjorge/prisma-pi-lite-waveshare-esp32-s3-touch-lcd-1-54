@@ -15,11 +15,7 @@ typedef struct {
     uint16_t y;
 } prisma_bsp_touch_sample_t;
 
-/**
- * Initialize the Waveshare ESP32-S3-Touch-LCD-1.54 hardware required by M1.
- *
- * Hardware/controller details remain private to prisma_bsp.
- */
+/** Initialize the Waveshare ESP32-S3-Touch-LCD-1.54 hardware. */
 bool prisma_bsp_init(void);
 
 /** Return the current raw board bring-up status. */
@@ -30,6 +26,13 @@ void prisma_bsp_set_brightness(uint8_t percent);
 
 /** Fill the complete 240x240 LCD with one RGB565 color. */
 bool prisma_bsp_display_fill(uint16_t rgb565);
+
+/** Fill one clipped rectangle on the 240x240 LCD. */
+bool prisma_bsp_display_fill_rect(uint16_t x,
+                                  uint16_t y,
+                                  uint16_t width,
+                                  uint16_t height,
+                                  uint16_t rgb565);
 
 /** Poll the capacitive touch controller. */
 bool prisma_bsp_touch_read(prisma_bsp_touch_sample_t *sample);
