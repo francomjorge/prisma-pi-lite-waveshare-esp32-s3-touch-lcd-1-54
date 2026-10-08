@@ -14,7 +14,7 @@ static const char *TAG = "prisma_boot";
 void app_main(void)
 {
     ESP_LOGI(TAG, "PRISMA-PI Lite ESP32-S3");
-    ESP_LOGI(TAG, "Milestone M4.1: Wi-Fi connectivity foundation");
+    ESP_LOGI(TAG, "Milestone M4.1: autonomous local Wi-Fi + final appliance surfaces");
 
     bool platform_ok = prisma_platform_init();
     if (!platform_ok) {
@@ -24,16 +24,13 @@ void app_main(void)
     bool board_ok = prisma_bsp_init();
     prisma_bsp_status_t status = prisma_bsp_get_status();
 
-    if (status.display_ready) {
-        prisma_ui_init();
+    bool network_ok = prisma_network_init();
+    if (!network_ok) {
+        ESP_LOGW(TAG, "Local network unavailable; appliance operation continues");
     }
 
-    bool network_ok = false;
-    if (platform_ok) {
-        network_ok = prisma_network_init();
-    }
-    if (!network_ok) {
-        ESP_LOGW(TAG, "Network unavailable; local appliance operation continues");
+    if (status.display_ready) {
+        prisma_ui_init();
     }
 
     if (!board_ok) {
@@ -42,13 +39,13 @@ void app_main(void)
                  status.display_ready,
                  status.touch_ready);
     } else {
-        ESP_LOGI(TAG, "Hardware ready; local UI remains independent from network state");
+        ESP_LOGI(TAG, "Appliance ready: INTRO / NOW PLAYING / BROWSER / CORE EXTENDED");
     }
 
     bool was_pressed = false;
     uint32_t touch_count = 0;
-    prisma_network_mode_t last_network_mode = PRISMA_NETWORK_OFFLINE;
-    bool last_connected = false;
+    uint8_t last_clients = 255;
+    bool last_ready = false;
 
     while (true) {
         prisma_bsp_touch_sample_t touch = {0};
@@ -75,16 +72,15 @@ void app_main(void)
 
         if (network_ok) {
             prisma_network_status_t net = prisma_network_get_status();
-            if (net.mode != last_network_mode || net.connected != last_connected) {
+            if (net.local_ready != last_ready || net.clients != last_clients) {
                 ESP_LOGI(TAG,
-                         "Network state: mode=%u connected=%d ssid=%s ip=%s rssi=%d",
-                         (unsigned)net.mode,
-                         net.connected,
+                         "Local network: ready=%d ssid=%s ip=%s clients=%u",
+                         net.local_ready,
                          net.ssid,
                          net.ip,
-                         (int)net.rssi);
-                last_network_mode = net.mode;
-                last_connected = net.connected;
+                         (unsigned)net.clients);
+                last_ready = net.local_ready;
+                last_clients = net.clients;
             }
         }
 
