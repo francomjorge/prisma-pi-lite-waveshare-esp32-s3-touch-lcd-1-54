@@ -12,6 +12,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate active web source
+        run: python3 tools/test_web_baseline.py
+
       - name: Build ESP32-S3 firmware
         uses: espressif/esp-idf-ci-action@v1
         with:
