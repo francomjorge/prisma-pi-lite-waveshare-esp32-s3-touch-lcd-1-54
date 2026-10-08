@@ -234,7 +234,9 @@ static esp_err_t control_post(httpd_req_t *r)
 
     if (!page2_command_queue || xQueueSend(page2_command_queue, &cmd, 0) != pdTRUE) {
         ESP_LOGW(TAG, "WEB RX #%lu dropped: page2 command queue full", (unsigned long)cmd.seq);
-        httpd_resp_send_err(r, HTTPD_503_SERVICE_UNAVAILABLE, "Control queue busy");
+        httpd_resp_set_status(r, "503 Service Unavailable");
+        httpd_resp_set_type(r, "text/plain");
+        httpd_resp_sendstr(r, "Control queue busy");
         return ESP_FAIL;
     }
 
