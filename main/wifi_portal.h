@@ -12,3 +12,5 @@ void prisma_control_set_generation(int generation);
 void prisma_control_set_filename(const char *filename);
 void prisma_control_set_effect(int effect, bool enabled);
 bool prisma_control_get_effect(int effect);
+void prisma_control_set_effect_value(int effect, int value);
+int prisma_control_get_effect_value(int effect);
