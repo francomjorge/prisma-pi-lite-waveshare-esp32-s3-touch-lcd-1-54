@@ -20,6 +20,7 @@ typedef struct {
 
 typedef struct {
     uint32_t revision;
+    uint8_t active_page;
     uint8_t file_index;
     char file_name[24];
     uint8_t intensity;
@@ -29,6 +30,7 @@ typedef struct {
 
 bool prisma_app_init(void);
 prisma_synth_state_t prisma_app_get_state(void);
+void prisma_app_set_page(uint8_t page);
 void prisma_app_cycle_file(void);
 void prisma_app_set_intensity(uint8_t value);
 void prisma_app_toggle_bypass(void);
