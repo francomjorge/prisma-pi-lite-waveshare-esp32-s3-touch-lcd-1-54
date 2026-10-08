@@ -1,5 +1,8 @@
 idf_component_register(
-    SRCS "app_main.c"
+    SRCS "app36.c" "wifi_portal.c" "prisma_touch.c" "storage.c"
     INCLUDE_DIRS "."
-    REQUIRES prisma_bsp prisma_platform prisma_ui prisma_network
+    REQUIRES esp_wifi esp_event esp_netif nvs_flash esp_http_server esp_driver_gpio esp_driver_spi esp_driver_i2c esp_lcd spiffs
+    EMBED_TXTFILES "web/index.html" "web/style.css" "web/app.js"
 )
+
+spiffs_create_partition_image(storage ../storage FLASH_IN_PROJECT)
