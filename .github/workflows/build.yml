@@ -2,7 +2,7 @@ name: ESP-IDF build
 
 on:
   push:
-    branches: [main, m4.2a-appliance-intro-swipe]
+    branches: [main, m4.2a-appliance-intro-swipe, m4.2b-input-framework]
   workflow_dispatch:
 
 jobs:

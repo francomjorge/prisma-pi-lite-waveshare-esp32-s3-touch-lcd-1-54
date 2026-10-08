@@ -6,6 +6,7 @@
 typedef struct {
     bool display_ready;
     bool touch_ready;
+    bool buttons_ready;
     uint8_t brightness_percent;
 } prisma_bsp_status_t;
 
@@ -14,6 +15,11 @@ typedef struct {
     uint16_t x;
     uint16_t y;
 } prisma_bsp_touch_sample_t;
+
+typedef struct {
+    bool t1_pressed;
+    bool t2_pressed;
+} prisma_bsp_button_state_t;
 
 /** Initialize the Waveshare ESP32-S3-Touch-LCD-1.54 hardware. */
 bool prisma_bsp_init(void);
@@ -36,3 +42,6 @@ bool prisma_bsp_display_fill_rect(uint16_t x,
 
 /** Poll the capacitive touch controller. */
 bool prisma_bsp_touch_read(prisma_bsp_touch_sample_t *sample);
+
+/** Poll the two navigation buttons. Active-low; T1=GPIO0, T2=GPIO4. */
+bool prisma_bsp_buttons_read(prisma_bsp_button_state_t *state);

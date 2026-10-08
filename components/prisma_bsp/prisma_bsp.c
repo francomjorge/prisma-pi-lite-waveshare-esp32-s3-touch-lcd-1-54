@@ -32,6 +32,10 @@
 #define PRISMA_PIN_TOUCH_INT GPIO_NUM_48
 #define PRISMA_PIN_TOUCH_RST GPIO_NUM_47
 
+/* Waveshare factory navigation buttons: BOOT/back and PLUS/forward. */
+#define PRISMA_PIN_BUTTON_T1 GPIO_NUM_0
+#define PRISMA_PIN_BUTTON_T2 GPIO_NUM_4
+
 #define PRISMA_I2C_PORT 0
 
 #define PRISMA_BL_TIMER LEDC_TIMER_0
@@ -55,7 +59,7 @@ static prisma_bsp_status_t s_status = {0};
 static bool s_initialized = false;
 
 /*
- * UI M2 uses a tiny fixed palette. Each cached DMA buffer is immutable after
+ * UI uses a tiny fixed palette. Each cached DMA buffer is immutable after
  * assignment, so queued SPI transfers never observe a buffer being recolored.
  */
 static DMA_ATTR uint16_t s_color_buffers[PRISMA_COLOR_CACHE_SLOTS][PRISMA_COLOR_BUFFER_PIXELS];
@@ -114,6 +118,26 @@ static bool init_backlight(void)
     err = ledc_channel_config(&channel);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Backlight channel init failed: %s", esp_err_to_name(err));
+        return false;
+    }
+
+    return true;
+}
+
+static bool init_navigation_buttons(void)
+{
+    gpio_config_t cfg = {
+        .pin_bit_mask = (1ULL << PRISMA_PIN_BUTTON_T1) |
+                        (1ULL << PRISMA_PIN_BUTTON_T2),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+
+    esp_err_t err = gpio_config(&cfg);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Navigation button init failed: %s", esp_err_to_name(err));
         return false;
     }
 
@@ -239,7 +263,7 @@ static bool init_touch(void)
 bool prisma_bsp_init(void)
 {
     if (s_initialized) {
-        return s_status.display_ready && s_status.touch_ready;
+        return s_status.display_ready && s_status.touch_ready && s_status.buttons_ready;
     }
     s_initialized = true;
 
@@ -248,6 +272,8 @@ bool prisma_bsp_init(void)
     if (!init_backlight()) {
         return false;
     }
+
+    s_status.buttons_ready = init_navigation_buttons();
 
     s_status.display_ready = init_display();
     if (!s_status.display_ready) {
@@ -263,8 +289,9 @@ bool prisma_bsp_init(void)
 
     ESP_LOGI(TAG, "Display: %s", s_status.display_ready ? "ready" : "failed");
     ESP_LOGI(TAG, "Touch: %s", s_status.touch_ready ? "ready" : "failed");
+    ESP_LOGI(TAG, "Buttons: %s (T1=GPIO0 T2=GPIO4)", s_status.buttons_ready ? "ready" : "failed");
 
-    return s_status.display_ready && s_status.touch_ready;
+    return s_status.display_ready && s_status.touch_ready && s_status.buttons_ready;
 }
 
 prisma_bsp_status_t prisma_bsp_get_status(void)
@@ -379,5 +406,23 @@ bool prisma_bsp_touch_read(prisma_bsp_touch_sample_t *sample)
         sample->y = y;
     }
 
+    return true;
+}
+
+bool prisma_bsp_buttons_read(prisma_bsp_button_state_t *state)
+{
+    if (state == NULL) {
+        return false;
+    }
+
+    state->t1_pressed = false;
+    state->t2_pressed = false;
+
+    if (!s_status.buttons_ready) {
+        return false;
+    }
+
+    state->t1_pressed = gpio_get_level(PRISMA_PIN_BUTTON_T1) == 0;
+    state->t2_pressed = gpio_get_level(PRISMA_PIN_BUTTON_T2) == 0;
     return true;
 }

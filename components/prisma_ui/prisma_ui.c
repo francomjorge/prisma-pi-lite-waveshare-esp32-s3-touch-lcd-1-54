@@ -27,6 +27,7 @@ static char s_seen_ip[16] = {0};
 static uint8_t s_logo_phase = 0;
 static TickType_t s_last_logo_tick = 0;
 static uint8_t s_intro_glitch_level = 0;
+static prisma_ui_gesture_t s_pending_gesture = PRISMA_UI_GESTURE_NONE;
 
 typedef struct {
     bool active;
@@ -335,13 +336,19 @@ static void set_page(uint8_t page)
     render();
 }
 
-static void page_delta(int delta)
+void prisma_ui_page_previous(void)
 {
-    int page = (int)current_page() + delta;
-    if (page < 0) page = 0;
-    if (page >= PAGE_COUNT) page = PAGE_COUNT - 1;
-    if (page != (int)current_page()) {
-        set_page((uint8_t)page);
+    uint8_t page = current_page();
+    if (page > 0U) {
+        set_page((uint8_t)(page - 1U));
+    }
+}
+
+void prisma_ui_page_next(void)
+{
+    uint8_t page = current_page();
+    if (page + 1U < PAGE_COUNT) {
+        set_page((uint8_t)(page + 1U));
     }
 }
 
@@ -403,12 +410,7 @@ static void intro_tap(void)
 
 static void handle_tap(uint8_t page, uint16_t x, uint16_t y)
 {
-    if (y >= 214) {
-        uint8_t target = (uint8_t)(x / 60U);
-        if (target >= PAGE_COUNT) target = PAGE_COUNT - 1;
-        set_page(target);
-        return;
-    }
+    (void)x;
 
     if (page == PRISMA_VIEW_INTRO) {
         intro_tap();
@@ -448,11 +450,9 @@ static void finish_gesture(void)
     int dy = (int)s_touch.last_y - (int)s_touch.start_y;
 
     if (is_horizontal_swipe(dx, dy)) {
-        if (dx < 0) {
-            page_delta(+1);
-        } else {
-            page_delta(-1);
-        }
+        s_pending_gesture = dx < 0
+                                ? PRISMA_UI_GESTURE_SWIPE_LEFT
+                                : PRISMA_UI_GESTURE_SWIPE_RIGHT;
         return;
     }
 
@@ -498,6 +498,17 @@ void prisma_ui_handle_touch_sample(bool pressed, uint16_t x, uint16_t y)
         finish_gesture();
         memset(&s_touch, 0, sizeof(s_touch));
     }
+}
+
+bool prisma_ui_take_gesture(prisma_ui_gesture_t *gesture)
+{
+    if (gesture == NULL || s_pending_gesture == PRISMA_UI_GESTURE_NONE) {
+        return false;
+    }
+
+    *gesture = s_pending_gesture;
+    s_pending_gesture = PRISMA_UI_GESTURE_NONE;
+    return true;
 }
 
 void prisma_ui_tick(void)
