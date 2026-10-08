@@ -17,6 +17,7 @@ static volatile int control_intensity=61;
 static volatile int control_generation=1;
 static char control_filename[32]="F1_MOON.JPG";
 static volatile bool control_effects[6]={false,false,false,false,false,true};
+static volatile int control_effect_values[6]={50,50,50,50,50,50};
 
 bool prisma_control_get_on(void){return control_on;}
 int prisma_control_get_mode(void){return control_mode;}
@@ -29,6 +30,8 @@ void prisma_control_set_generation(int v){control_generation=v;}
 void prisma_control_set_filename(const char *v){if(v&&*v)strlcpy(control_filename,v,sizeof(control_filename));}
 void prisma_control_set_effect(int effect,bool enabled){if(effect<0||effect>=6)return;if(effect==5)enabled=true;control_effects[effect]=enabled;}
 bool prisma_control_get_effect(int effect){if(effect<0||effect>=6)return false;if(effect==5)return true;return control_effects[effect];}
+void prisma_control_set_effect_value(int effect,int value){if(effect<0||effect>=6)return;if(value<0)value=0;if(value>100)value=100;control_effect_values[effect]=value;}
+int prisma_control_get_effect_value(int effect){if(effect<0||effect>=6)return 0;return control_effect_values[effect];}
 
 extern const uint8_t web_index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t web_index_html_end[] asm("_binary_index_html_end");
@@ -43,8 +46,8 @@ static esp_err_t css_get(httpd_req_t*r){return send_embedded(r,"text/css",web_st
 static esp_err_t js_get(httpd_req_t*r){return send_embedded(r,"application/javascript",web_app_js_start,web_app_js_end);}
 
 static esp_err_t state_get(httpd_req_t*r){
- char b[384];
- snprintf(b,sizeof(b),"{\"on\":%s,\"mode\":%d,\"intensity\":%d,\"generation\":%d,\"filename\":\"%s\",\"effects\":[%s,%s,%s,%s,%s,true]}",control_on?"true":"false",control_mode,control_intensity,control_generation,control_filename,control_effects[0]?"true":"false",control_effects[1]?"true":"false",control_effects[2]?"true":"false",control_effects[3]?"true":"false",control_effects[4]?"true":"false");
+ char b[640];
+ snprintf(b,sizeof(b),"{\"on\":%s,\"mode\":%d,\"intensity\":%d,\"generation\":%d,\"filename\":\"%s\",\"effects\":[%s,%s,%s,%s,%s,true],\"effect_values\":[%d,%d,%d,%d,%d,%d]}",control_on?"true":"false",control_mode,control_intensity,control_generation,control_filename,control_effects[0]?"true":"false",control_effects[1]?"true":"false",control_effects[2]?"true":"false",control_effects[3]?"true":"false",control_effects[4]?"true":"false",control_effect_values[0],control_effect_values[1],control_effect_values[2],control_effect_values[3],control_effect_values[4],control_effect_values[5]);
  httpd_resp_set_type(r,"application/json");httpd_resp_set_hdr(r,"Cache-Control","no-store");return httpd_resp_sendstr(r,b);
 }
 
