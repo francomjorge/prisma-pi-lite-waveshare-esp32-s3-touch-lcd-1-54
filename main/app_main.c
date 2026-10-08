@@ -15,7 +15,7 @@ static const char *TAG = "prisma_boot";
 void app_main(void)
 {
     ESP_LOGI(TAG, "PRISMA-PI Lite ESP32-S3");
-    ESP_LOGI(TAG, "Milestone M4.2: shared synth state + vintage local web");
+    ESP_LOGI(TAG, "Milestone M4.2a: appliance intro + continuous swipe tracking");
 
     bool platform_ok = prisma_platform_init();
     if (!platform_ok) {
@@ -54,20 +54,22 @@ void app_main(void)
         prisma_bsp_touch_sample_t touch = {0};
         bool read_ok = prisma_bsp_touch_read(&touch);
 
-        if (read_ok && touch.pressed && !was_pressed) {
-            ++touch_count;
-            ESP_LOGI(TAG,
-                     "Touch #%lu x=%u y=%u",
-                     (unsigned long)touch_count,
-                     (unsigned)touch.x,
-                     (unsigned)touch.y);
+        if (read_ok) {
+            if (touch.pressed && !was_pressed) {
+                ++touch_count;
+                ESP_LOGI(TAG,
+                         "Touch #%lu begin x=%u y=%u",
+                         (unsigned long)touch_count,
+                         (unsigned)touch.x,
+                         (unsigned)touch.y);
+            }
 
             if (status.display_ready) {
-                prisma_ui_handle_touch(touch.x, touch.y);
+                prisma_ui_handle_touch_sample(touch.pressed, touch.x, touch.y);
             }
-        }
 
-        was_pressed = read_ok && touch.pressed;
+            was_pressed = touch.pressed;
+        }
 
         if (status.display_ready) {
             prisma_ui_tick();

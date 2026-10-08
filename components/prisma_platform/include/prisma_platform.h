@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define PRISMA_FW_VERSION "0.4.1-m4.1"
+#define PRISMA_FW_VERSION "0.4.2-m4.2a"
 
 typedef enum {
     PRISMA_VIEW_INTRO = 0,
