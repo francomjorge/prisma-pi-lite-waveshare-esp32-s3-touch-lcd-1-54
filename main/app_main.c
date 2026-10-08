@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "prisma_app.h"
 #include "prisma_bsp.h"
 #include "prisma_network.h"
 #include "prisma_platform.h"
@@ -14,12 +15,14 @@ static const char *TAG = "prisma_boot";
 void app_main(void)
 {
     ESP_LOGI(TAG, "PRISMA-PI Lite ESP32-S3");
-    ESP_LOGI(TAG, "Milestone M4.1: autonomous local Wi-Fi + final appliance surfaces");
+    ESP_LOGI(TAG, "Milestone M4.2: shared synth state + vintage local web");
 
     bool platform_ok = prisma_platform_init();
     if (!platform_ok) {
         ESP_LOGW(TAG, "Persistent settings unavailable; using runtime defaults");
     }
+
+    (void)prisma_app_init();
 
     bool board_ok = prisma_bsp_init();
     prisma_bsp_status_t status = prisma_bsp_get_status();
