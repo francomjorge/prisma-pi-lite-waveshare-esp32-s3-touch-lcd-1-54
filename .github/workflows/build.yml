@@ -2,7 +2,7 @@ name: ESP-IDF build
 
 on:
   push:
-    branches: [main, m4.1-local-ap-final-surfaces]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
