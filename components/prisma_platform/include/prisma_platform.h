@@ -3,14 +3,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define PRISMA_FW_VERSION "0.4.0-m4.1"
+#define PRISMA_FW_VERSION "0.4.1-m4.1"
 
 typedef enum {
-    PRISMA_VIEW_HOME = 0,
-    PRISMA_VIEW_INPUT,
-    PRISMA_VIEW_OUTPUT,
-    PRISMA_VIEW_SYSTEM,
-    PRISMA_VIEW_DIAGNOSTICS,
+    PRISMA_VIEW_INTRO = 0,
+    PRISMA_VIEW_NOW_PLAYING,
+    PRISMA_VIEW_BROWSER,
+    PRISMA_VIEW_CORE_EXTENDED,
 } prisma_view_t;
 
 typedef struct {
