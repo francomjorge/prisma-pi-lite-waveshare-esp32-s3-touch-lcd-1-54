@@ -163,35 +163,102 @@ static void page_effects(void)
 
 static void power_hold(void){gpio_config_t p = {.pin_bit_mask=1ULL<<BAT_POWER_PIN,.mode=GPIO_MODE_OUTPUT};ESP_ERROR_CHECK(gpio_config(&p));ESP_ERROR_CHECK(gpio_set_level(BAT_POWER_PIN,1));}
 static void draw_page(int page, int phase){if (page == 0) page_intro(phase);else if (page == 1) page_controls();else if (page == 2) page_monitor();else page_effects();}
-static void toggle_power(void){bool was = synth_on;synth_on = !synth_on;if (!was && synth_on) mode_index = 1;ESP_LOGI(TAG,"SYNTH -> %s",synth_on?"ON":"OFF");}
+
+static void toggle_power(void)
+{
+    bool was = synth_on;
+    synth_on = !synth_on;
+    if (!was && synth_on) mode_index = 1;
+    prisma_control_set_on(synth_on);
+    prisma_control_set_mode(mode_index ? 1 : 0);
+    ESP_LOGI(TAG,"APPLIANCE TX on=%s mode=%s",synth_on?"ON":"OFF",mode_index?"BYPASS":"RANDOM");
+}
+
 static bool page_needs_input_debounce(int page){return page == 1 || page == 3;}
+
+static void apply_web_page2_commands(int current_page)
+{
+    prisma_page2_command_t cmd;
+    bool redraw = false;
+
+    while (prisma_control_take_page2_command(&cmd)) {
+        if (cmd.has_on && synth_on != cmd.on) {
+            bool was = synth_on;
+            synth_on = cmd.on;
+            if (!was && synth_on) mode_index = 1;
+            prisma_control_set_on(synth_on);
+            prisma_control_set_mode(mode_index ? 1 : 0);
+            redraw = true;
+        }
+
+        if (cmd.has_mode) {
+            if (synth_on) {
+                mode_index = cmd.mode ? 1 : 0;
+                prisma_control_set_mode(mode_index);
+                redraw = true;
+            } else {
+                ESP_LOGW(TAG,"WEB APPLY #%lu mode ignored while synth OFF",(unsigned long)cmd.seq);
+            }
+        }
+
+        if (cmd.has_intensity) {
+            if (synth_on) {
+                intensity = cmd.intensity;
+                if (intensity < 0) intensity = 0;
+                if (intensity > 100) intensity = 100;
+                prisma_control_set_intensity(intensity);
+                redraw = true;
+            } else {
+                ESP_LOGW(TAG,"WEB APPLY #%lu intensity ignored while synth OFF",(unsigned long)cmd.seq);
+            }
+        }
+
+        if (cmd.source_next) {
+            const char *src = prisma_storage_next();
+            prisma_control_set_filename(src);
+            redraw = true;
+        }
+
+        ESP_LOGI(
+            TAG,
+            "WEB APPLY #%lu on=%s source=%s intensity=%d mode=%s",
+            (unsigned long)cmd.seq,
+            synth_on?"ON":"OFF",
+            prisma_storage_current(),
+            intensity,
+            mode_index?"BYPASS":"RANDOM");
+    }
+
+    if (redraw && current_page == 1) page_controls();
+}
 
 void app_main(void)
 {
-    power_hold();ESP_LOGI(TAG,"PRISMA-PI LITE M4.2I PAGE2 DEBOUNCE + COMPACT PAGE4");
+    power_hold();ESP_LOGI(TAG,"PRISMA-PI LITE M4.4 PAGE2 BIDIRECTIONAL");
     gpio_config_t bl = {.pin_bit_mask=1ULL<<LCD_PIN_BL,.mode=GPIO_MODE_OUTPUT};ESP_ERROR_CHECK(gpio_config(&bl));gpio_set_level(LCD_PIN_BL,0);
     spi_bus_config_t bus = {.sclk_io_num=LCD_PIN_SCLK,.mosi_io_num=LCD_PIN_MOSI,.miso_io_num=-1,.quadwp_io_num=-1,.quadhd_io_num=-1,.max_transfer_sz=W*40*2};ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST,&bus,SPI_DMA_CH_AUTO));
     esp_lcd_panel_io_handle_t io = NULL;esp_lcd_panel_io_spi_config_t ioc = {.dc_gpio_num=LCD_PIN_DC,.cs_gpio_num=LCD_PIN_CS,.pclk_hz=40000000,.lcd_cmd_bits=8,.lcd_param_bits=8,.spi_mode=0,.trans_queue_depth=10};ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST,&ioc,&io));
     esp_lcd_panel_dev_config_t pc = {.reset_gpio_num=LCD_PIN_RST,.rgb_ele_order=LCD_RGB_ELEMENT_ORDER_RGB,.bits_per_pixel=16};ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(io,&pc,&panel));ESP_ERROR_CHECK(esp_lcd_panel_reset(panel));ESP_ERROR_CHECK(esp_lcd_panel_init(panel));ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel,true));ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel,true));
     int phase = 0;page_intro(phase);gpio_set_level(LCD_PIN_BL,1);
-    bool touch = prisma_touch_init();ESP_LOGI(TAG,"TOUCH: %s",touch?"READY":"FAILED");prisma_wifi_start();for (int i=0;i<EFFECT_COUNT;i++) prisma_control_set_effect(i,effect_enabled[i]);
+    bool touch = prisma_touch_init();ESP_LOGI(TAG,"TOUCH: %s",touch?"READY":"FAILED");prisma_wifi_start();prisma_control_set_on(synth_on);prisma_control_set_mode(mode_index);prisma_control_set_intensity(intensity);prisma_control_set_filename(prisma_storage_current());for (int i=0;i<EFFECT_COUNT;i++) prisma_control_set_effect(i,effect_enabled[i]);
     int page = 0;uint16_t x=0,y=0,startx=0,starty=0;bool down=false;bool input_lock=false;int input_lock_ticks=0;int miss=0,anim=0,home_cooldown=0;
     while (1) {
+        apply_web_page2_commands(page);
         if (home_cooldown > 0) home_cooldown--;bool touched = touch && prisma_touch_read(&x,&y);
         if (input_lock) {down=false;miss=0;if (touched) input_lock_ticks=CONTROL_DEBOUNCE_TICKS;else if (input_lock_ticks>0) input_lock_ticks--;else input_lock=false;}
         else if (touched) {miss=0;if (!down) {startx=x;starty=y;down=true;} else if ((int)startx-(int)x>55 && page<PAGE_COUNT-1) {page++;glitch_count=0;draw_page(page,phase);down=false;if (page_needs_input_debounce(page)) {input_lock=true;input_lock_ticks=CONTROL_DEBOUNCE_TICKS;}} else if ((int)x-(int)startx>55 && page>0) {page--;glitch_count=0;if (page==0) home_cooldown=HOME_COOLDOWN_TICKS;draw_page(page,phase);down=false;if (page_needs_input_debounce(page)) {input_lock=true;input_lock_ticks=CONTROL_DEBOUNCE_TICKS;}}}
         else if (down && ++miss>4) {
             if (page==0 && home_cooldown==0) glitch(startx,starty);
             else if (page==1 && startx>=170 && startx<=232 && starty>=5 && starty<=42) {toggle_power();page_controls();}
-            else if (page==1 && startx>=12 && startx<=165 && starty>=45 && starty<=85) {const char *src=prisma_storage_next();prisma_control_set_filename(src);page_controls();ESP_LOGI(TAG,"SOURCE -> %s",src);}
-            else if (page==1 && synth_on && startx>=12 && startx<=228 && starty>=106 && starty<=132) {intensity=((int)startx-12)*100/216;if (intensity<0) intensity=0;if (intensity>100) intensity=100;page_controls();ESP_LOGI(TAG,"INTENSITY -> %d",intensity);}
-            else if (page==1 && synth_on && startx>=82 && startx<=232 && starty>=139 && starty<=181) {mode_index=mode_index?0:1;page_controls();ESP_LOGI(TAG,"MODE -> %s",mode_index?"BYPASS":"RANDOM");}
+            else if (page==1 && startx>=12 && startx<=165 && starty>=45 && starty<=85) {const char *src=prisma_storage_next();prisma_control_set_filename(src);page_controls();ESP_LOGI(TAG,"APPLIANCE TX source=%s",src);}
+            else if (page==1 && synth_on && startx>=12 && startx<=228 && starty>=106 && starty<=132) {intensity=((int)startx-12)*100/216;if (intensity<0) intensity=0;if (intensity>100) intensity=100;prisma_control_set_intensity(intensity);page_controls();ESP_LOGI(TAG,"APPLIANCE TX intensity=%d",intensity);}
+            else if (page==1 && synth_on && startx>=82 && startx<=232 && starty>=139 && starty<=181) {mode_index=mode_index?0:1;prisma_control_set_mode(mode_index);page_controls();ESP_LOGI(TAG,"APPLIANCE TX mode=%s",mode_index?"BYPASS":"RANDOM");}
             else if (page==3 && starty>=FX_ROW_Y-6 && starty<FX_ROW_Y-6+EFFECT_COUNT*FX_ROW_STEP) {
                 int effect=((int)starty-(FX_ROW_Y-6))/FX_ROW_STEP;
                 if (effect>=0 && effect<EFFECT_COUNT) {
                     if (effect==4) {if (startx>=FX_BAR_X && startx<FX_BAR_X+51) {effect_enabled[4]=true;prisma_control_set_effect(4,true);ESP_LOGI(TAG,"EFFECT MIRROR -> ON");} else if (startx>=FX_BAR_X+51 && startx<=FX_BAR_X+FX_BAR_W) {effect_enabled[4]=false;prisma_control_set_effect(4,false);ESP_LOGI(TAG,"EFFECT MIRROR -> OFF");}}
                     else if (startx<FX_BAR_X) {if (effect<EFFECT_COUNT-1) {effect_enabled[effect]=!effect_enabled[effect];prisma_control_set_effect(effect,effect_enabled[effect]);ESP_LOGI(TAG,"EFFECT %s -> %s",effect_names[effect],effect_enabled[effect]?"ON":"OFF");} else {effect_enabled[5]=true;prisma_control_set_effect(5,true);}}
-                    else if (synth_on && startx<=FX_BAR_X+FX_BAR_W) {int value=((int)startx-FX_BAR_X)*100/FX_BAR_W;if (value<0) value=0;if (value>100) value=100;effect_value[effect]=value;ESP_LOGI(TAG,"EFFECT %s LEVEL -> %d",effect_names[effect],value);}
+                    else if (synth_on && startx<=FX_BAR_X+FX_BAR_W) {int value=((int)startx-FX_BAR_X)*100/FX_BAR_W;if (value<0) value=0;if (value>100) value=100;effect_value[effect]=value;prisma_control_set_effect_value(effect,value);ESP_LOGI(TAG,"EFFECT %s LEVEL -> %d",effect_names[effect],value);}
                     page_effects();
                 }
             }
