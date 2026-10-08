@@ -5,6 +5,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "prisma_bsp.h"
+#include "prisma_platform.h"
 #include "prisma_ui.h"
 
 static const char *TAG = "prisma_boot";
@@ -12,7 +13,12 @@ static const char *TAG = "prisma_boot";
 void app_main(void)
 {
     ESP_LOGI(TAG, "PRISMA-PI Lite ESP32-S3");
-    ESP_LOGI(TAG, "Milestone M2: first interactive UI");
+    ESP_LOGI(TAG, "Milestone M3: interactive shell + persistence");
+
+    bool platform_ok = prisma_platform_init();
+    if (!platform_ok) {
+        ESP_LOGW(TAG, "Persistent settings unavailable; using runtime defaults");
+    }
 
     bool board_ok = prisma_bsp_init();
     prisma_bsp_status_t status = prisma_bsp_get_status();
@@ -27,7 +33,7 @@ void app_main(void)
                  status.display_ready,
                  status.touch_ready);
     } else {
-        ESP_LOGI(TAG, "M2 ready: touch the screen to enter PRISMA home");
+        ESP_LOGI(TAG, "M3 ready: HOME / INPUT / OUTPUT / SYSTEM + diagnostics");
     }
 
     bool was_pressed = false;
@@ -51,6 +57,11 @@ void app_main(void)
         }
 
         was_pressed = read_ok && touch.pressed;
+
+        if (status.display_ready) {
+            prisma_ui_tick();
+        }
+
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
