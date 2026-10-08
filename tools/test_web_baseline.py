@@ -8,6 +8,8 @@ style = (root / "main/web/style.css").read_text(encoding="utf-8")
 app = (root / "main/web/app.js").read_text(encoding="utf-8")
 cmake = (root / "main/CMakeLists.txt").read_text(encoding="utf-8")
 portal = (root / "main/wifi_portal.c").read_text(encoding="utf-8")
+header = (root / "main/wifi_portal.h").read_text(encoding="utf-8")
+main = (root / "main/main.c").read_text(encoding="utf-8")
 wrapper = (root / "main/app36.c").read_text(encoding="utf-8")
 
 EXPECTED_PAGES = 4
@@ -26,7 +28,7 @@ assert "pg*25" in index, "web transform step must match 4-page layout"
 for name in ("index.html", "style.css", "app.js"):
     assert f'"web/{name}"' in cmake, f"{name} is not embedded by active main component"
 
-for route in ('"/"', '"/style.css"', '"/app.js"', '"/api/state"', '"/source/*"'):
+for route in ('"/"', '"/style.css"', '"/app.js"', '"/api/state"', '"/api/control"', '"/source/*"'):
     assert route in portal, f"missing HTTP route {route}"
 
 for effect_id in range(6):
@@ -34,11 +36,28 @@ for effect_id in range(6):
 for label in ("PIXEL", "GLITCH", "POSTER", "HUE", "MIRROR", "MIX"):
     assert label in index, f"missing effect label {label}"
 
-assert "fetch('/api/state'" in app, "read-only state polling missing"
+for control_id in ("sourceSelect", "power", "intensityBar", "mode"):
+    assert f'id="{control_id}"' in index, f"missing page 2 interactive control {control_id}"
+
+assert "fetch('/api/state'" in app, "state polling missing"
+assert "fetch('/api/control'" in app, "page 2 control POST missing"
+assert "method:'POST'" in app, "page 2 control API is not POST based"
+for payload in ("{on:desired}", "{mode:desired}", "{intensity:draftIntensity}", "{source_next:true}"):
+    assert payload in app, f"missing page 2 outbound control payload {payload}"
+
+assert "prisma_page2_command_t" in header, "page 2 command contract missing"
+assert "prisma_control_take_page2_command" in header, "appliance command consumer declaration missing"
+assert "prisma_control_take_page2_command" in portal, "HTTP command queue missing"
+assert "prisma_control_take_page2_command" in main, "appliance is not consuming web page 2 commands"
+assert "WEB RX" in portal, "serial WEB RX tracing missing"
+assert "WEB TX" in portal, "serial WEB TX tracing missing"
+assert "WEB APPLY" in main, "serial web-to-appliance apply tracing missing"
+assert "APPLIANCE TX" in main, "serial appliance-to-web tracing missing"
+
 assert "effect_values" in app, "web does not consume effect levels"
 assert '"effect_values"' in portal or '\\"effect_values\\"' in portal, "API does not expose effect levels"
 assert "prisma_control_set_effect_value" in portal, "effect level state setter missing"
 assert "prisma_control_set_effect_value" in wrapper, "appliance effect levels are not mirrored to web state"
 assert "appendChild(section)" not in app, "pages must remain static; do not inject page 4 dynamically"
 
-print("WEB4 OK: 4 static pages, 25% layout, effect state/value sync contract, explicit embedded assets")
+print("WEB4 + PAGE2 BIDI OK: 4 static pages, two-way page 2 API, serial tracing, page 4 read-only")
