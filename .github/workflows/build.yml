@@ -2,7 +2,7 @@ name: ESP-IDF build
 
 on:
   push:
-    branches: [main, m4.3-consolidated, m4.3-web4-readonly, m4.4-page2-bidirectional]
+    branches: [main, m4.3-consolidated, m4.3-web4-readonly, m4.4-page2-bidirectional, m4.5-unified-build58-sync]
   workflow_dispatch:
 
 jobs:
