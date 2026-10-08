@@ -29,6 +29,10 @@ static void mirror_task(void *arg)
         prisma_control_set_on(prisma_shared_on);
         prisma_control_set_mode(prisma_shared_mode ? 1 : 0);
         prisma_control_set_intensity(prisma_shared_intensity);
+        for (int i = 0; i < EFFECT_COUNT; i++) {
+            prisma_control_set_effect(i, effect_enabled[i]);
+            prisma_control_set_effect_value(i, effect_value[i]);
+        }
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
@@ -42,6 +46,10 @@ void app_main(void)
     prisma_control_set_intensity(prisma_shared_intensity);
     prisma_storage_init();
     prisma_control_set_filename(prisma_storage_current());
+    for (int i = 0; i < EFFECT_COUNT; i++) {
+        prisma_control_set_effect(i, effect_enabled[i]);
+        prisma_control_set_effect_value(i, effect_value[i]);
+    }
     xTaskCreate(mirror_task, "prisma_mirror", 3072, NULL, 4, NULL);
     prisma_legacy_main();
 }
