@@ -8,7 +8,7 @@ This repository contains the device/runtime implementation only. Product behavio
 
 **M0 — Architecture and build spine**
 
-The repository now defines the firmware architecture, hardware baseline, ESP-IDF build spine, OTA-capable flash layout and implementation order. Hardware drivers begin in M1.
+The repository defines the firmware architecture, hardware baseline, ESP-IDF build spine, OTA-capable flash layout and implementation order. Hardware drivers begin in M1.
 
 ## Architectural rule
 
