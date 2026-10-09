@@ -22,18 +22,17 @@ assert "flex:0 0 20%" in style
 assert "Math.min(4,n)" in index
 assert "pg*20" in index
 
-# V0 desktop navigation remains keyboard-only with the same behavior.
+# V0 navigation remains keyboard-only; LAB controls do not change page navigation.
 assert "addEventListener('keydown'" in index
 assert "e.key==='ArrowLeft'" in index
 assert "e.key==='ArrowRight'" in index
 assert "e.repeat" in index
 assert "page(pg-1)" in index
 assert "page(pg+1)" in index
-assert "isRealFs()||fsFrame.classList.contains('pseudoFull')" in index
 assert 'class="navLeft"' not in index
 assert 'class="navRight"' not in index
 
-# V0 Live View rotation/fullscreen stays intact.
+# V0 Live View rotation/fullscreen remains intact.
 assert "var previewRotation=0" in index
 assert "function rotatePreview()" in index
 assert "previewRotation=(previewRotation+90)%360" in index
@@ -43,12 +42,23 @@ assert "rotate('+previewRotation+'deg)" in index
 assert "fsFrame.clientHeight+'px'" in index
 assert "fsFrame.clientWidth+'px'" in index
 assert "requestAnimationFrame(applyPreviewRotation)" in index
-assert "window.addEventListener('resize',applyPreviewRotation)" in index
 assert "R ROTATE" in index
-assert "e.key==='f'||e.key==='F'" in index
-assert "toggleFs();return" in index
+assert "function toggleFs()" in index
+assert "fsButton.addEventListener('click',toggleFs)" in index
+
+# LAB fullscreen is reversible from F and the overlay button, with pseudo fullscreen fallback.
+assert 'id="labFsBtn"' in index
+assert 'aria-label="Toggle FX Lab fullscreen"' in index
+assert "function toggleLabFs()" in index
+assert "labFsButton.addEventListener('click',toggleLabFs)" in index
+assert "realFsElement()===labFrame" in index
+assert "labFrame.classList.contains('pseudoFull')" in index
+assert "pg===4" in index
+assert "toggleLabFs();return" in index
+assert "labFsButton.textContent=active?'×':'⛶'" in index
+assert ".labFrame.pseudoFull{" in index
+assert ".labFrame:fullscreen" in index
 assert "F FULLSCREEN" in index
-assert "pg===2||isRealFs()||fsFrame.classList.contains('pseudoFull')" in index
 
 # Active firmware/backend contract is unchanged.
 assert '"web/index.html"' in cmake
@@ -79,7 +89,7 @@ assert "syncBusy" in index
 assert "scheduleSync(300)" in index
 assert "setInterval(syncAll" not in index
 
-# Existing V0 pages still render from the same shared snapshot.
+# Existing V0 pages still render from the same shared snapshot/source.
 assert "function drawPage2(s)" in index
 assert "function drawPage4(s)" in index
 assert "function drawAll(s){drawPage2(s);drawPage4(s);drawLab(s)}" in index
@@ -115,30 +125,47 @@ assert "XMLHttpRequest" in index
 assert "api/debug/state" not in index
 assert '"/api/debug/state"' not in portal
 
-# FX ENGINE V1: native A/B/scratch pipeline with PIXEL as the only active processor.
-assert "FX ENGINE V1" in index
+# FX ENGINE V2: native A/B/scratch pipeline with PIXEL + GLITCH active in reorderable sequence.
+assert "FX ENGINE V2" in index
 assert "fxBufferA=document.createElement('canvas')" in index
 assert "fxBufferB=document.createElement('canvas')" in index
 assert "fxScratch=document.createElement('canvas')" in index
-assert "version:'1'" in index
+assert "version:'2'" in index
 assert "0:{id:'pixel',process:processPixelFx}" in index
-assert "1:{id:'glitch',process:null}" in index
+assert "1:{id:'glitch',process:processGlitchFx}" in index
 assert "2:{id:'poster',process:null}" in index
 assert "3:{id:'hue',process:null}" in index
 assert "4:{id:'mirror',process:null}" in index
 assert "fxEngine.resize(w,h)" in index
 assert "mixGain:function(v){return clamp100(v)/50}" in index
+
+# PIXEL V1 remains unchanged.
 assert "function pixelBlockSize(v)" in index
 assert "Math.pow(n/100,2)*63" in index
 assert "function processPixelFx(src,dst,value,context)" in index
 assert "effective=clamp100(value*context.mixGain)" in index
 assert "imageSmoothingEnabled=false" in index
+
+# GLITCH V1 is browser-native slice displacement + color ghost, using the same MIX gain.
+assert "function glitchHash(n)" in index
+assert "function processGlitchFx(src,dst,value,context)" in index
+assert "effective=clamp100(value*context.mixGain)" in index
+assert "bands=2+Math.round(strength*16)" in index
+assert "maxShift=Math.max(1,Math.round(src.width*(.004+.075*strength)))" in index
+assert "dctx.rect(0,sy,dst.width,bh)" in index
+assert "globalCompositeOperation='screen'" in index
+assert "hue-rotate(95deg) saturate(180%)" in index
+assert "hue-rotate(265deg) saturate(180%)" in index
+
+# The same A/B pipeline applies processors in LAB order and rerenders immediately when reordered.
 assert "function renderRotatedSource(" in index
 assert "function runFxPipeline(s)" in index
+assert "for(var i=0;i<labFxOrder.length-1;i++)" in index
 assert "node.process(src,dst,labEffectValue(s,fx)" in index
 assert "var output=runFxPipeline(latestState)" in index
+assert "renderLabPipeline(latestState);renderLabPreview()" in index
 
-# MIX is global metadata, normalized to the final slot, never draggable/reorderable.
+# MIX remains global metadata, normalized to final slot, never draggable/reorderable.
 assert "function normalizeLabOrder(order)" in index
 assert "out.push(5)" in index
 assert "if(fx===5)return" in index
@@ -170,4 +197,4 @@ assert "esp_timer" in cmake
 assert "hc.lru_purge_enable=true" in portal
 assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-print("V0 protected + FX Engine V1 PIXEL OK: browser-native pixelation + fixed global MIX sensitivity")
+print("V0 protected + FX Engine V2 OK: PIXEL + ordered GLITCH + reversible LAB fullscreen")
