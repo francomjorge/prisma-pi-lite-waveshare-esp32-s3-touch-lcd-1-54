@@ -23,16 +23,24 @@ assert 'data-theme-pick="alt"' in admin
 assert 'READ ONLY / ON DEMAND' in admin
 assert 'NO BACKGROUND POLLING' in admin
 
-# Overview is deliberately only Wi-Fi + storage free + existing media files.
-for field in ('ovWifi','ovClients','wifiRefresh','ovStorage','ovStorageSub','ovStorageBar','ovMediaCount','ovMediaList'):
-    assert f'id="{field}"' in admin, field
-for removed in ('ovDevice','ovBattery','ovVersion','ovHealthState','ovHealthAdmin','ovHealthStorage','ovHealthNetwork'):
+# Overview is intentionally clean: large Live View Extended + future upload placeholder.
+for removed in ('ovWifi','ovClients','wifiRefresh','ovStorage','ovStorageSub','ovStorageBar','ovMediaCount','ovMediaList'):
     assert f'id="{removed}"' not in admin, removed
-assert '<div class="cardTitle">Wi-Fi</div>' in admin
-assert '<div class="cardTitle">Storage free</div>' in admin
-assert '<div class="cardTitle">Media files</div>' in admin
+assert 'APPLIANCE STATUS' not in admin
+assert 'Overview liviano' not in admin
+assert 'statusDot' not in admin
+assert '<div class="card w8 overviewLiveCard">' in admin
+assert '<div class="cardTitle">Live View Extended</div>' in admin
+assert 'id="overviewLiveFrame"' in admin
+assert 'id="overviewPreview"' in admin
+assert 'id="overviewLiveBadge"' in admin
+assert 'id="overviewRefresh"' in admin
+assert '<div class="card w4 placeholder uploadFuture">' in admin
+assert '<div class="cardTitle">Media Upload</div>' in admin
+assert 'UPLOAD FILES' in admin
+assert '<button class="wideBtn" disabled>COMING SOON</button>' in admin
 
-# No background polling loops in Admin. Reads happen once on tab activation/button click.
+# No background polling loops in Admin. Reads happen only once initially or on explicit navigation/button action.
 for forbidden in ('function loopStatus()', 'function loopState()', 'function loopStorage()', 'function loopNetwork()', 'function loopSensors()', 'setInterval('):
     assert forbidden not in admin, forbidden
 assert 'setTimeout(loop' not in admin
@@ -43,7 +51,10 @@ assert "api('/api/admin/storage'" in admin
 assert "api('/api/admin/sensors'" in admin
 assert "api('/api/admin/overview'" in admin
 assert "api('/api/state'" in admin
-assert 'loadStorageOnce();' in admin
+assert "if(name==='storage')loadStorageOnce();" in admin
+assert admin.rstrip().endswith('</body></html>')
+assert 'loadStateOnce();\n})();' in admin
+assert 'loadStorageOnce();\n})();' not in admin
 
 # Parameter surface still mirrors authoritative /api/state on demand.
 for field in ('paPower','paMode','paIntensity','paSource','paGeneration'):
@@ -65,7 +76,7 @@ assert 'storage_files_cached' in api
 assert r'\"snapshot\":\"boot\"' in api
 assert 'file_count' in api
 
-# Wi-Fi is only read inside the explicit network endpoint.
+# Wi-Fi remains explicit/on-demand only.
 assert 'Wi-Fi is intentionally calculated only when this endpoint is requested.' in api
 assert 'esp_wifi_get_config(WIFI_IF_AP' in api
 assert 'esp_wifi_ap_get_sta_list' in api
@@ -97,6 +108,7 @@ assert 'body.menuOpen .sidebar' in css
 assert 'html[data-theme="alt"]' in css
 assert '.liveWrap' in css
 assert '.wideBtn{' in css
+assert '.card.w8' in css and '.card.w4' in css
 assert "e.key==='r'||e.key==='R'" in admin
 assert "e.key==='f'||e.key==='F'" in admin
 assert 'function toggleFs()' in admin
@@ -119,4 +131,4 @@ assert '"prisma_sensors.c"' in cmake and '"prisma_metrics.c"' in cmake and '"adm
 assert 'esp_adc' in cmake and 'esp_driver_tsens' in cmake and 'heap' in cmake and 'spi_flash' in cmake
 assert 'ADMIN READ-ONLY / PHASE 1' in version
 
-print('v1.1 admin OK: 3-card overview + boot-cached storage/media + Wi-Fi on demand + zero background polling')
+print('v1.1 admin OK: clean 2:1 overview live/upload layout + zero background polling + cached storage + on-demand telemetry')
