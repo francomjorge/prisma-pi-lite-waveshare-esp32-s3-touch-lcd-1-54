@@ -6,8 +6,8 @@
 #include "esp_adc/adc_cali_scheme.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_flash.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
-#include "esp_psram.h"
 
 /* Waveshare ESP32-S3-Touch-LCD-1.54 factory pin mapping. */
 #define BAT_ADC_UNIT ADC_UNIT_1
@@ -151,5 +151,5 @@ uint32_t prisma_metrics_flash_size(void)
 
 uint32_t prisma_metrics_psram_size(void)
 {
-    return (uint32_t)esp_psram_get_size();
+    return (uint32_t)heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
 }
