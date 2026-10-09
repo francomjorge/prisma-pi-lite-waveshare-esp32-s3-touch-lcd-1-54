@@ -17,7 +17,7 @@
 <section class="page"><div id="effects" class="effects"><div id="fx0" class="fxrow off"><div class="fxline"><div class="fxname">PIXEL</div><div id="fxv0" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill0" class="fxfill"></div></div></div><div id="fx1" class="fxrow off"><div class="fxline"><div class="fxname">GLITCH</div><div id="fxv1" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill1" class="fxfill"></div></div></div><div id="fx2" class="fxrow off"><div class="fxline"><div class="fxname">POSTER</div><div id="fxv2" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill2" class="fxfill"></div></div></div><div id="fx3" class="fxrow off"><div class="fxline"><div class="fxname">HUE</div><div id="fxv3" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill3" class="fxfill"></div></div></div><div id="fx4" class="fxrow off mirrorRow"><div class="fxline"><div class="fxname">MIRROR</div><div id="fxmirror" class="fxswitch off">OFF</div></div></div><div id="fx5" class="fxrow"><div class="fxline"><div class="fxname">MIX</div><div id="fxv5" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill5" class="fxfill"></div></div></div></div><div class="hint effectsHint">EFFECTS / READ ONLY</div></section>
 </div></main>
 <div class="dots"><i id="d0" class="dot on"></i><i id="d1" class="dot"></i><i id="d2" class="dot"></i><i id="d3" class="dot"></i></div>
-<div class="hint bottomHint">SWIPE LEFT / RIGHT · PAGE 2 LIVE SYNC</div>
+<div class="hint bottomHint">SWIPE LEFT / RIGHT · GLOBAL LIVE SYNC</div>
 <script>
 var pg=0,sx=0,navBlocked=false;var v=document.getElementById('v'),t=document.getElementById('t');
 function page(n){pg=Math.max(0,Math.min(3,n));t.style.transform='translateX(-'+(pg*25)+'%)';for(var i=0;i<4;i++)document.getElementById('d'+i).className='dot'+(i===pg?' on':'');}
@@ -30,14 +30,20 @@ function fsLabel(){fsButton.textContent=(isRealFs()||fsFrame.classList.contains(
 function toggleFs(){if(isRealFs()){var exit=document.exitFullscreen||document.webkitExitFullscreen;if(exit)exit.call(document);return}if(fsFrame.classList.contains('pseudoFull')){fsFrame.classList.remove('pseudoFull');fsLabel();return}try{if(fsFrame.requestFullscreen){fsFrame.requestFullscreen();return}if(fsFrame.webkitRequestFullscreen){fsFrame.webkitRequestFullscreen();return}}catch(e){}fsFrame.classList.add('pseudoFull');fsLabel()}
 fsButton.addEventListener('click',toggleFs);document.addEventListener('fullscreenchange',fsLabel);document.addEventListener('webkitfullscreenchange',fsLabel);
 
-/* Existing Page 2 path stays separate and polls only while Page 2 is visible. */
-var p2last='',currentSource='',p2Timer=0;var sourcePreview=document.getElementById('sourcePreview');
+/* M4.9: one serialized global poll keeps every web surface synchronized. */
+var stateLast='',currentSource='',syncTimer=0,syncBusy=false;var sourcePreview=document.getElementById('sourcePreview');
 function clamp100(v){v=Number(v);if(!isFinite(v))return 0;return Math.max(0,Math.min(100,Math.round(v)))}
 function cleanSourceName(name){return (name||'F1_MOON.JPG').replace(/[^A-Za-z0-9._-]/g,'')}
 function setSource(name){if(!sourcePreview)return;var f=cleanSourceName(name);if(!f||f===currentSource)return;currentSource=f;sourcePreview.style.visibility='visible';sourcePreview.src='/source/'+encodeURIComponent(f)+'?v='+Date.now()}
 if(sourcePreview){sourcePreview.onerror=function(){sourcePreview.style.visibility='hidden'};sourcePreview.onload=function(){sourcePreview.style.visibility='visible'}}
+
 function drawPage2(s){var power=document.getElementById('power'),mode=document.getElementById('mode'),pct=document.getElementById('pct'),fill=document.getElementById('fill'),filename=document.getElementById('filename'),controls=document.getElementById('controls');var iv=clamp100(s.intensity);if(power){power.textContent=s.on?'ON':'OFF';power.className=s.on?'power':'power off'}if(mode)mode.textContent=s.mode?'BYPASS':'RANDOM';if(pct)pct.textContent=iv+'%';if(fill)fill.style.width=iv+'%';if(filename)filename.textContent=(s.filename||'F1_MOON.JPG').toUpperCase();if(controls)controls.className=s.on?'':'disabled';var photo=document.querySelector('.photo');if(photo)photo.classList.toggle('off',!s.on);setSource(s.filename)}
-function syncPage2(){clearTimeout(p2Timer);if(pg!==1){p2Timer=setTimeout(syncPage2,500);return}var x=new XMLHttpRequest();x.open('GET','/api/state?ts='+Date.now(),true);x.timeout=1500;x.onload=function(){if(x.status===200){try{var s=JSON.parse(x.responseText),j=JSON.stringify(s);if(j!==p2last){p2last=j;drawPage2(s)}}catch(e){}}p2Timer=setTimeout(syncPage2,300)};x.onerror=x.ontimeout=function(){p2Timer=setTimeout(syncPage2,600)};x.send(null)}
-syncPage2();
+
+function drawPage4(s){var ef=Array.isArray(s.effects)?s.effects:[],vals=Array.isArray(s.values)?s.values:[];for(var i=0;i<6;i++){var enabled=(i===5)?true:!!ef[i];var row=document.getElementById('fx'+i);if(row)row.className='fxrow'+(enabled?'':' off')+(i===4?' mirrorRow':'');if(i===4){var sw=document.getElementById('fxmirror');if(sw){sw.textContent=enabled?'ON':'OFF';sw.className=enabled?'fxswitch':'fxswitch off'}}else{var vv=clamp100(vals[i]);var value=document.getElementById('fxv'+i),fill=document.getElementById('fxfill'+i);if(value)value.textContent=vv;if(fill)fill.style.width=vv+'%'}}}
+
+function drawAll(s){drawPage2(s);drawPage4(s)}
+function scheduleSync(delay){clearTimeout(syncTimer);syncTimer=setTimeout(syncAll,delay)}
+function syncAll(){if(syncBusy){scheduleSync(100);return}syncBusy=true;var x=new XMLHttpRequest();x.open('GET','/api/state?ts='+Date.now(),true);x.timeout=1500;x.onload=function(){syncBusy=false;if(x.status===200){try{var s=JSON.parse(x.responseText),j=JSON.stringify(s);if(j!==stateLast){stateLast=j;drawAll(s)}scheduleSync(300);return}catch(e){}}scheduleSync(600)};x.onerror=x.ontimeout=function(){syncBusy=false;scheduleSync(600)};x.send(null)}
+syncAll();
 </script>
 </body></html>
