@@ -1,6 +1,15 @@
 #pragma once
 #include <stdbool.h>
+
 void prisma_wifi_start(void);
+
+/* Direct authoritative state exported by app36.c for /api/state. */
+bool prisma_appliance_get_on(void);
+int prisma_appliance_get_mode(void);
+int prisma_appliance_get_intensity(void);
+const char *prisma_appliance_get_filename(void);
+
+/* Legacy/shared setters retained for current appliance effect/source code. */
 bool prisma_control_get_on(void);
 int prisma_control_get_mode(void);
 int prisma_control_get_intensity(void);
