@@ -112,9 +112,12 @@ assert "SYNC LAB" not in index
 assert "api/debug/state" not in index
 assert '"/api/debug/state"' not in portal
 assert 'id="d4"' not in index
-assert "esp_timer" not in cmake
+
+# v1.1 Admin uses esp_timer only for read-only uptime telemetry.
+# The validated v1.0 controller UI and navigation remain unchanged.
+assert "esp_timer" in cmake
 
 assert "hc.lru_purge_enable=true" in portal
 assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-print("v1.0 OK: stable controller + desktop arrows + R Live View rotation + global sync + black OFF + clean fullscreen UI")
+print("v1.0 controller OK inside v1.1: arrows + R rotation + global sync + black OFF + clean fullscreen UI")
