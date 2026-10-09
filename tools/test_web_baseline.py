@@ -5,9 +5,9 @@ import re
 root = Path(__file__).resolve().parents[1]
 index = (root / "main/web/index.html").read_text(encoding="utf-8")
 style = (root / "main/web/style.css").read_text(encoding="utf-8")
-app = (root / "main/web/app.js").read_text(encoding="utf-8")
 cmake = (root / "main/CMakeLists.txt").read_text(encoding="utf-8")
 portal = (root / "main/wifi_portal.c").read_text(encoding="utf-8")
+header = (root / "main/wifi_portal.h").read_text(encoding="utf-8")
 wrapper = (root / "main/app36.c").read_text(encoding="utf-8")
 
 EXPECTED_PAGES = 4
@@ -21,38 +21,36 @@ assert "flex:0 0 25%" in style
 assert "Math.min(3,n)" in index
 assert "pg*25" in index
 
-for name in ("index.html", "style.css", "app.js"):
-    assert f'"web/{name}"' in cmake
+# Single active web source: Page2 sync is inline, not external app.js.
+assert '"web/index.html"' in cmake
+assert '"web/style.css"' in cmake
+assert '"web/app.js"' not in cmake
+assert '<script src="/app.js"></script>' not in index
+assert '"/app.js"' not in portal
+assert '"/api/control"' not in portal
 
-for route in ('"/"', '"/style.css"', '"/app.js"', '"/api/state"', '"/source/*"'):
-    assert route in portal, f"missing route {route}"
-
-# Diagnostic build deliberately restores the Build 58 one-way contract.
-assert '"/api/control"' not in portal, "M4.6 must remain read-only"
-assert "fetch('/api/control'" not in app, "M4.6 web must not POST controls"
-assert "fetch('/api/state'" in app, "Build58 state polling missing"
-assert "setInterval(sync,300)" in app, "Build58 300 ms polling missing"
-
-for control_id in ("power", "pct", "fill", "mode", "filename"):
-    assert f'id="{control_id}"' in index, f"missing page2 display {control_id}"
-
-# Critical Build 58 mechanism: main.c is included through aliases so the mirror
-# reads the exact appliance variables, then republishes them every 100 ms.
-for alias in (
-    "#define synth_on prisma_shared_on",
-    "#define mode_index prisma_shared_mode",
-    "#define intensity prisma_shared_intensity",
-    "#define app_main prisma_legacy_main",
+# Direct authoritative appliance state contract.
+for symbol in (
+    "prisma_appliance_get_on",
+    "prisma_appliance_get_mode",
+    "prisma_appliance_get_intensity",
+    "prisma_appliance_get_filename",
 ):
-    assert alias in wrapper, f"missing Build58 alias {alias}"
+    assert symbol in header, f"missing declaration {symbol}"
+    assert symbol in wrapper, f"missing direct getter {symbol}"
+    assert symbol in portal, f"/api/state not using {symbol}"
 
-for call in (
-    "prisma_control_set_on(prisma_shared_on)",
-    "prisma_control_set_mode(prisma_shared_mode ? 1 : 0)",
-    "prisma_control_set_intensity(prisma_shared_intensity)",
-    "pdMS_TO_TICKS(100)",
-):
-    assert call in wrapper, f"missing Build58 mirror operation {call}"
+assert "mirror_task" not in wrapper, "Page2 must not depend on mirrored duplicate state"
+assert "PAGE2 GET TX" in portal, "state-change serial trace missing"
+assert '"/api/state"' in portal
+assert '"/source/*"' in portal
+assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-assert "BUILD58 READ-ONLY PAGE2 SYNC ACTIVE" in wrapper
-print("M4.6 OK: 4-page shell + exact Build58-style read-only Page2 mirror")
+# Inline browser polling and DOM updates.
+assert "async function syncPage2()" in index
+assert "fetch('/api/state?t='+Date.now()" in index
+assert "setInterval(syncPage2,300)" in index
+for control_id in ("filename", "power", "pct", "fill", "mode"):
+    assert f'id="{control_id}"' in index
+
+print("M4.7 OK: 4-page layout + direct authoritative read-only Page2 + inline 300ms polling")
