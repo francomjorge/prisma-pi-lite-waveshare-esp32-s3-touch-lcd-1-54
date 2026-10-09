@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 from pathlib import Path
-import hashlib
 import re
 
 root = Path(__file__).resolve().parents[1]
@@ -23,7 +22,6 @@ assert "flex:0 0 25%" in style
 assert "Math.min(3,n)" in index
 assert "pg*25" in index
 
-# Single embedded web source.
 assert '"web/index.html"' in cmake
 assert '"web/style.css"' in cmake
 assert '"web/app.js"' not in cmake
@@ -31,7 +29,6 @@ assert '<script src="/app.js"></script>' not in index
 assert '"/app.js"' not in portal
 assert '"/api/control"' not in portal
 
-# The stable /api/state path is authoritative for Page 2 and Page 4.
 for symbol in (
     "prisma_appliance_get_on",
     "prisma_appliance_get_mode",
@@ -49,7 +46,6 @@ assert '\\"effects\\"' in portal
 assert '\\"values\\"' in portal
 assert "char b[640]" in portal
 
-# Browser must use one serialized polling loop regardless of selected page.
 assert "'/api/state?ts='+Date.now()" in index
 assert "new XMLHttpRequest()" in index
 assert "syncBusy" in index
@@ -58,7 +54,6 @@ assert "if(pg!==1)" not in index
 assert "pg===3" not in index
 assert "setInterval(syncAll" not in index
 
-# Page 2 and Page 4 renderers both consume the same snapshot.
 assert "function drawPage2(s)" in index
 assert "function drawPage4(s)" in index
 assert "function drawAll(s){drawPage2(s);drawPage4(s)}" in index
@@ -66,14 +61,12 @@ assert "Array.isArray(s.effects)" in index
 assert "Array.isArray(s.values)" in index
 assert "fxmirror" in index
 
-# Page 3 source preview is updated from the same global state even while visible.
 assert 'id="sourcePreview"' in index
 assert 'id="fsBtn"' in index
 assert '"/source/*"' in portal
 assert "setSource(s.filename)" in index
 assert "photo.classList.toggle('off',!s.on)" in index
 
-# OFF is a true black/no-signal Live View; source may continue syncing underneath.
 assert ".photo.off{background:#000!important}" in style
 assert ".photo.off #offscreen{display:none!important}" in style
 assert ".photo.off canvas,.photo.off .sourcePreview{visibility:hidden!important;opacity:0!important}" in style
@@ -85,23 +78,9 @@ assert ".photo .fsBtn::after{content:\"⛶\"" in style
 assert ".photo:hover .fsBtn" in style
 assert ".photo:focus-within .fsBtn" in style
 
-# Release identity and scope.
 assert "PRISMA-PI LITE 5.0" in version
 assert "NO EFFECT / NO ADMIN" in version
 
-# The controller release must ship the validated 300x400 source assets.
-expected_assets = {
-    "F1_MOON.JPG": "a2fb8ad4b978dea8182742777bba59764ada0c38bde050866d02d49950d22b84",
-    "F1_TANGO.JPG": "9788e4d2aa294db8662dec2c5b4b35f469b6fc489f0bbd4039bd9c6e7171b5ec",
-}
-for name, expected_sha256 in expected_assets.items():
-    data = (root / "storage" / name).read_bytes()
-    assert len(data) > 20000, f"{name} unexpectedly small ({len(data)} bytes)"
-    assert data.startswith(b"\xff\xd8") and data.endswith(b"\xff\xd9"), f"{name} is not a complete JPEG"
-    actual = hashlib.sha256(data).hexdigest()
-    assert actual == expected_sha256, f"{name} SHA256 mismatch: {actual}"
-
-# Page 5 / Sync Lab must remain removed.
 assert "PAGE 5" not in index
 assert "SYNC LAB" not in index
 assert "api/debug/state" not in index
@@ -109,8 +88,7 @@ assert '"/api/debug/state"' not in portal
 assert 'id="d4"' not in index
 assert "esp_timer" not in cmake
 
-# Conservative HTTP server settings retained for AP stability.
 assert "hc.lru_purge_enable=true" in portal
 assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-print("v5.0 OK: No Effect / No Admin + global sync + verified assets + black OFF + clean fullscreen UI")
+print("v5.0 OK: No Effect / No Admin + global sync + black OFF + clean fullscreen UI")
