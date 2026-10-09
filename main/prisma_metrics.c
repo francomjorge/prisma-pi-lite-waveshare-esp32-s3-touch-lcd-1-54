@@ -1,37 +1,64 @@
 #include "prisma_metrics.h"
 
+#include "driver/gpio.h"
+#include "driver/temperature_sensor.h"
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
 #include "esp_adc/adc_oneshot.h"
+#include "esp_flash.h"
 #include "esp_log.h"
+#include "esp_psram.h"
 
+/* Waveshare ESP32-S3-Touch-LCD-1.54 factory pin mapping. */
 #define BAT_ADC_UNIT ADC_UNIT_1
-#define BAT_ADC_CHANNEL ADC_CHANNEL_0
+#define BAT_ADC_CHANNEL ADC_CHANNEL_0  /* GPIO1 */
 #define BAT_ADC_ATTEN ADC_ATTEN_DB_12
 #define BAT_DIVIDER_X1000 3000
+#define BAT_CHARGING_PIN GPIO_NUM_3
 
 static const char *TAG = "PRISMA_METRICS";
 static adc_oneshot_unit_handle_t adc_handle;
 static adc_cali_handle_t cali_handle;
 static bool adc_ready;
 static bool cali_ready;
+static bool charging_gpio_ready;
+static temperature_sensor_handle_t temp_handle;
+static bool temp_ready;
 
+/* Same level thresholds used by Waveshare's ESP-IDF 5.5.1 factory BSP. */
 static int battery_percent_from_mv(int mv)
 {
-    if (mv >= 4200) return 100;
-    if (mv <= 3300) return 0;
-    if (mv >= 4100) return 90 + (mv - 4100) * 10 / 100;
-    if (mv >= 4000) return 80 + (mv - 4000) * 10 / 100;
-    if (mv >= 3900) return 65 + (mv - 3900) * 15 / 100;
-    if (mv >= 3800) return 50 + (mv - 3800) * 15 / 100;
-    if (mv >= 3700) return 30 + (mv - 3700) * 20 / 100;
-    if (mv >= 3600) return 15 + (mv - 3600) * 15 / 100;
-    if (mv >= 3400) return 5 + (mv - 3400) * 10 / 200;
-    return (mv - 3300) * 5 / 100;
+    if (mv < 3520) return 1;
+    if (mv < 3640) return 20;
+    if (mv < 3760) return 40;
+    if (mv < 3880) return 60;
+    if (mv < 4000) return 80;
+    return 100;
 }
 
 void prisma_metrics_init(void)
 {
+    if (!charging_gpio_ready) {
+        gpio_config_t charging = {
+            .pin_bit_mask = 1ULL << BAT_CHARGING_PIN,
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_ENABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE,
+        };
+        charging_gpio_ready = gpio_config(&charging) == ESP_OK;
+    }
+
+    if (!temp_ready) {
+        temperature_sensor_config_t cfg = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 80);
+        if (temperature_sensor_install(&cfg, &temp_handle) == ESP_OK &&
+            temperature_sensor_enable(temp_handle) == ESP_OK) {
+            temp_ready = true;
+        } else {
+            ESP_LOGW(TAG, "Chip temperature sensor unavailable");
+        }
+    }
+
     if (adc_ready) return;
 
     adc_oneshot_unit_init_cfg_t unit_cfg = {
@@ -60,7 +87,7 @@ void prisma_metrics_init(void)
     };
     cali_ready = adc_cali_create_scheme_curve_fitting(&cali_cfg, &cali_handle) == ESP_OK;
     adc_ready = true;
-    ESP_LOGI(TAG, "Battery ADC ready%s", cali_ready ? " (calibrated)" : " (raw fallback)");
+    ESP_LOGI(TAG, "Waveshare battery ADC ready%s", cali_ready ? " (calibrated)" : " (raw fallback)");
 }
 
 bool prisma_metrics_battery(int *millivolts, int *percent)
@@ -92,4 +119,37 @@ bool prisma_metrics_battery(int *millivolts, int *percent)
     *millivolts = batt_mv;
     *percent = battery_percent_from_mv(batt_mv);
     return true;
+}
+
+bool prisma_metrics_charging(bool *charging)
+{
+    if (!charging) return false;
+    if (!charging_gpio_ready) prisma_metrics_init();
+    if (!charging_gpio_ready) return false;
+    int mv = 0, pct = 0;
+    if (prisma_metrics_battery(&mv, &pct) && pct >= 100) {
+        *charging = false;
+        return true;
+    }
+    *charging = gpio_get_level(BAT_CHARGING_PIN) == 0;
+    return true;
+}
+
+bool prisma_metrics_chip_temperature(float *celsius)
+{
+    if (!celsius) return false;
+    if (!temp_ready) prisma_metrics_init();
+    if (!temp_ready) return false;
+    return temperature_sensor_get_celsius(temp_handle, celsius) == ESP_OK;
+}
+
+uint32_t prisma_metrics_flash_size(void)
+{
+    uint32_t size = 0;
+    return esp_flash_get_size(NULL, &size) == ESP_OK ? size : 0;
+}
+
+uint32_t prisma_metrics_psram_size(void)
+{
+    return (uint32_t)esp_psram_get_size();
 }
