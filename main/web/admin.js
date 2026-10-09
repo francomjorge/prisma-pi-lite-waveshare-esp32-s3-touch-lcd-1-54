@@ -96,5 +96,5 @@ var button=q('wifiCheck');if(button)button.onclick=checkWifi;
 /* One request on page load. Endpoint returns RAM cache and never rescans SPIFFS. */
 getJson('/api/admin/storage',renderStorage,storageError);
 
-/* Intentionally no setInterval, recurring timeout, polling loop or background telemetry. */
+/* Intentionally no recurring polling or background telemetry. */
 })();
