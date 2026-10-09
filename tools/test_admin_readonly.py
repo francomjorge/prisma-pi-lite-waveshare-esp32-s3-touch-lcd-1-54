@@ -23,6 +23,24 @@ assert 'UPLOAD DISABLED' in admin
 assert 'QMI8658' in admin
 assert '512 KiB' in admin and '256 KiB' in admin and '>32<' in admin
 
+# Overview is appliance-health focused: no controller duplication.
+assert 'Controller snapshot' not in admin
+for field in (
+    'ovDevice','ovDeviceSub','ovBattery','ovBatteryV','ovWifi','ovClients',
+    'ovStorage','ovStorageSub','ovVersion','ovIdf','ovUptime','ovHeap',
+    'ovMinHeap','ovReset','ovBuild','ovHealthState','ovHealthAdmin',
+    'ovHealthStorage','ovHealthNetwork'
+):
+    assert f'id="{field}"' in admin, field
+assert 'Services health' in admin
+assert 'System health' in admin
+assert 'function serviceHealth(id,state)' in js
+for health in ('ovHealthState','ovHealthAdmin','ovHealthStorage','ovHealthNetwork'):
+    assert health in js
+assert "setText('ovDevice','ONLINE')" in js
+assert "setText('ovDevice','OFFLINE')" in js
+assert "setText('ovWifi','ACTIVE')" in js
+
 # First read-only parameter surface reuses the authoritative controller state.
 for field in ('paPower','paMode','paIntensity','paSource','paGeneration'):
     assert f'id="{field}"' in admin
@@ -70,4 +88,4 @@ assert '"admin_api.c"' in cmake and '"prisma_metrics.c"' in cmake
 assert 'esp_adc' in cmake
 assert 'ADMIN READ-ONLY / PHASE 1' in version
 
-print('v1.1 admin OK: read-only dashboard + parameters + F fullscreen + responsive navigation + skins + real telemetry')
+print('v1.1 admin OK: appliance-health overview + parameters + F fullscreen + responsive navigation + skins + real telemetry')
