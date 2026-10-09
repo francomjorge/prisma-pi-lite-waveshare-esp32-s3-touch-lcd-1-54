@@ -17,38 +17,35 @@ for section in ("overview","live","parameters","storage","network","power","sens
     assert f'data-section="{section}"' in admin, section
 
 assert '/admin.css' in admin
-# Admin telemetry is intentionally inline, matching the proven main-controller web pattern.
 assert '<script src="/admin.js"' not in admin
-assert 'function loopStatus()' in admin
-assert "api('/api/admin/status'" in admin
-assert "api('/api/admin/storage'" in admin
-assert "api('/api/admin/network'" in admin
-assert "api('/api/admin/sensors'" in admin
-assert "api('/api/state'" in admin
 assert 'data-theme-pick="prisma"' in admin
 assert 'data-theme-pick="alt"' in admin
-assert 'READ ONLY / PHASE 1' in admin
-assert 'UPLOAD DISABLED' in admin
-assert 'QMI8658' in admin
-assert '512 KiB' in admin and '256 KiB' in admin and '>32<' in admin
+assert 'READ ONLY / ON DEMAND' in admin
+assert 'NO BACKGROUND POLLING' in admin
 
-# Overview is appliance-health focused and populated by the consolidated status endpoint.
-assert 'Controller snapshot' not in admin
-for field in (
-    'ovDevice','ovDeviceSub','ovBattery','ovBatteryV','ovWifi','ovClients',
-    'ovStorage','ovStorageSub','ovVersion','ovIdf','ovUptime','ovTemp','ovFlash',
-    'ovPsram','ovHeap','ovMinHeap','ovReset','ovBuild','ovHealthState',
-    'ovHealthAdmin','ovHealthStorage','ovHealthNetwork'
-):
+# Overview is deliberately only Wi-Fi + storage free + existing media files.
+for field in ('ovWifi','ovClients','wifiRefresh','ovStorage','ovStorageSub','ovStorageBar','ovMediaCount','ovMediaList'):
     assert f'id="{field}"' in admin, field
-assert 'Services health' in admin
-assert 'System health' in admin
-assert 'function health(id,state)' in admin
-assert "txt('ovDevice','ONLINE')" in admin
-assert "txt('ovDevice','OFFLINE')" in admin
-assert "txt('ovWifi','ACTIVE')" in admin
+for removed in ('ovDevice','ovBattery','ovVersion','ovHealthState','ovHealthAdmin','ovHealthStorage','ovHealthNetwork'):
+    assert f'id="{removed}"' not in admin, removed
+assert '<div class="cardTitle">Wi-Fi</div>' in admin
+assert '<div class="cardTitle">Storage free</div>' in admin
+assert '<div class="cardTitle">Media files</div>' in admin
 
-# Parameter surface still mirrors authoritative /api/state.
+# No background polling loops in Admin. Reads happen once on tab activation/button click.
+for forbidden in ('function loopStatus()', 'function loopState()', 'function loopStorage()', 'function loopNetwork()', 'function loopSensors()', 'setInterval('):
+    assert forbidden not in admin, forbidden
+assert 'setTimeout(loop' not in admin
+assert 'function loadStorageOnce()' in admin
+assert 'function loadWifiOnDemand()' in admin
+assert "api('/api/admin/network'" in admin
+assert "api('/api/admin/storage'" in admin
+assert "api('/api/admin/sensors'" in admin
+assert "api('/api/admin/overview'" in admin
+assert "api('/api/state'" in admin
+assert 'loadStorageOnce();' in admin
+
+# Parameter surface still mirrors authoritative /api/state on demand.
 for field in ('paPower','paMode','paIntensity','paSource','paGeneration'):
     assert f'id="{field}"' in admin
 for i in range(6):
@@ -57,7 +54,24 @@ for i in range(6):
 assert 'Array.isArray(s.effects)' in admin
 assert 'Array.isArray(s.values)' in admin
 
-# Official Waveshare-style system and power telemetry.
+# Storage is calculated/scanned exactly once per boot and then served from RAM cache.
+assert 'static bool storage_snapshot_done;' in api
+assert 'static void admin_storage_snapshot_init(void)' in api
+assert 'if (storage_snapshot_done) return;' in api
+assert 'admin_storage_snapshot_init();' in api
+assert api.count('esp_spiffs_info("storage"') == 1
+assert api.count('opendir("/storage")') == 1
+assert 'storage_files_cached' in api
+assert '\"snapshot\":\"boot\"' in api
+assert 'file_count' in api
+
+# Wi-Fi is only read inside the explicit network endpoint.
+assert 'Wi-Fi is intentionally calculated only when this endpoint is requested.' in api
+assert 'esp_wifi_get_config(WIFI_IF_AP' in api
+assert 'esp_wifi_ap_get_sta_list' in api
+assert 'return admin_overview_get(r);' in api
+
+# Official Waveshare-style system and power telemetry remains available on demand.
 assert 'BAT_CHARGING_PIN GPIO_NUM_3' in metrics
 assert 'BAT_ADC_CHANNEL ADC_CHANNEL_0' in metrics
 assert 'BAT_DIVIDER_X1000 3000' in metrics
@@ -65,7 +79,7 @@ assert 'temperature_sensor_get_celsius' in metrics
 assert 'esp_flash_get_size' in metrics
 assert 'heap_caps_get_total_size(MALLOC_CAP_SPIRAM)' in metrics
 
-# QMI8658 shares the already-created touchscreen I2C bus, like the factory example.
+# QMI8658 remains on the shared touchscreen I2C bus.
 assert 'QMI8658_ADDR       0x6B' in sensors
 assert 'QMI8658_WHO_AM_I' in sensors
 assert 'id != 0x05' in sensors
@@ -83,7 +97,6 @@ assert 'body.menuOpen .sidebar' in css
 assert 'html[data-theme="alt"]' in css
 assert '.liveWrap' in css
 assert '.wideBtn{' in css
-
 assert "e.key==='r'||e.key==='R'" in admin
 assert "e.key==='f'||e.key==='F'" in admin
 assert 'function toggleFs()' in admin
@@ -99,13 +112,6 @@ assert '.uri="/api/admin/network"' in api
 assert 'HTTP_POST' not in api and 'HTTP_PUT' not in api and 'HTTP_DELETE' not in api
 assert 'ADMIN_MAX_FILE_BYTES (512U * 1024U)' in api
 assert 'ADMIN_STORAGE_RESERVE (256U * 1024U)' in api
-assert 'esp_wifi_ap_get_sta_list' in api
-assert 'esp_spiffs_info' in api
-assert 'prisma_metrics_battery' in api
-assert 'prisma_sensors_read_imu' in api
-assert 'httpd_resp_send_chunk(r, NULL, 0)' in api
-assert 'finish_chunks(r)' in api
-
 assert 'prisma_admin_register(s);' in portal
 assert 'hc.max_uri_handlers=16;' in portal
 assert '"web/admin.html"' in cmake and '"web/admin.css"' in cmake
@@ -113,4 +119,4 @@ assert '"prisma_sensors.c"' in cmake and '"prisma_metrics.c"' in cmake and '"adm
 assert 'esp_adc' in cmake and 'esp_driver_tsens' in cmake and 'heap' in cmake and 'spi_flash' in cmake
 assert 'ADMIN READ-ONLY / PHASE 1' in version
 
-print('v1.1 admin OK: inline live telemetry + official Waveshare system/battery/QMI8658 paths + files + read-only UI')
+print('v1.1 admin OK: 3-card overview + boot-cached storage/media + Wi-Fi on demand + zero background polling')
