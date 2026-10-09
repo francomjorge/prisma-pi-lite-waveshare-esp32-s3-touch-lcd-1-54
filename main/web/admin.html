@@ -7,59 +7,114 @@
 <link rel="stylesheet" href="/admin.css">
 </head>
 <body>
-<main class="shell">
-  <header class="top">
-    <div>
+<div class="adminShell">
+  <aside class="sidebar">
+    <div class="brandBlock">
       <div class="brand">PRISMA<span>-PI</span></div>
-      <div class="sub">LITE / ADMIN</div>
+      <div class="brandSub">LITE / ADMIN</div>
     </div>
-    <div class="mode">READ ONLY · ZERO POLLING</div>
-  </header>
 
-  <section class="intro">
-    <div class="eyebrow">APPLIANCE OVERVIEW</div>
-    <h1>ADMIN</h1>
-    <p>Only essential appliance information. Storage is captured once per boot. Wi-Fi is checked only on demand.</p>
-  </section>
+    <nav class="nav">
+      <button class="navBtn on" data-section="live">LIVE VIEW EXTENDED</button>
+      <button class="navBtn" data-section="sensors">SENSORS</button>
+      <button class="navBtn" data-section="system">SYSTEM</button>
+    </nav>
 
-  <section class="cards">
-    <article class="card wifiCard">
-      <div class="cardHead">
-        <div>
-          <div class="label">WI-FI</div>
-          <div id="wifiState" class="value compact">NOT CHECKED</div>
+    <div class="sideFoot">
+      <a href="/">← CONTROLLER</a>
+      <span>ZERO BACKGROUND POLLING</span>
+    </div>
+  </aside>
+
+  <div id="overlay" class="overlay"></div>
+
+  <section class="content">
+    <header class="topbar">
+      <button id="menuBtn" class="menuBtn" type="button">☰</button>
+      <div>
+        <div id="pageTitle" class="pageTitle">LIVE VIEW EXTENDED</div>
+        <div class="pageSub">PRISMA-PI LITE / ADMIN</div>
+      </div>
+      <div class="statusPill">READ ONLY</div>
+    </header>
+
+    <main class="main">
+      <section id="sec-live" class="section on">
+        <div class="sectionHead">
+          <div>
+            <h1>Live View Extended</h1>
+            <p>Reserved for the extended visualization surface.</p>
+          </div>
         </div>
-        <button id="wifiCheck" class="button" type="button">CHECK WI-FI</button>
-      </div>
-      <div class="details">
-        <div><span>SSID</span><b id="wifiSsid">--</b></div>
-        <div><span>IP</span><b id="wifiIp">--</b></div>
-        <div><span>Channel</span><b id="wifiChannel">--</b></div>
-        <div><span>Clients</span><b id="wifiClients">--</b></div>
-      </div>
-      <div id="wifiClientList" class="list muted">No Wi-Fi request has been made.</div>
-    </article>
+        <div class="emptyStage">
+          <div class="emptyCross"></div>
+          <div class="emptyLabel">LIVE VIEW EXTENDED</div>
+        </div>
+      </section>
 
-    <article class="card">
-      <div class="label">STORAGE FREE</div>
-      <div id="storageFree" class="value">--</div>
-      <div id="storageMeta" class="muted">Loading boot snapshot…</div>
-      <div class="bar"><div id="storageBar" class="barFill"></div></div>
-      <div class="note">Calculated once per appliance boot.</div>
-    </article>
+      <section id="sec-sensors" class="section">
+        <div class="sectionHead">
+          <div>
+            <h1>Sensors</h1>
+            <p>Reserved for motion sensors, microphone and future sensor inputs.</p>
+          </div>
+        </div>
+        <div class="emptyStage compactStage">
+          <div class="emptyCross"></div>
+          <div class="emptyLabel">SENSORS</div>
+        </div>
+      </section>
 
-    <article class="card">
-      <div class="label">MEDIA FILES</div>
-      <div id="mediaCount" class="value">--</div>
-      <div id="mediaList" class="list"><div class="file muted">Loading boot snapshot…</div></div>
-    </article>
+      <section id="sec-system" class="section">
+        <div class="sectionHead">
+          <div>
+            <h1>System</h1>
+            <p>Appliance connectivity and system settings.</p>
+          </div>
+        </div>
+
+        <div class="systemGrid">
+          <article class="card">
+            <div class="cardTop">
+              <div>
+                <div class="cardEyebrow">NETWORK</div>
+                <h2>Wi-Fi</h2>
+              </div>
+              <button id="wifiCheck" class="actionBtn" type="button">CHECK WI-FI</button>
+            </div>
+
+            <div id="wifiState" class="heroValue">NOT CHECKED</div>
+            <div class="kv">
+              <div>SSID</div><b id="wifiSsid">--</b>
+              <div>IP ADDRESS</div><b id="wifiIp">--</b>
+              <div>CHANNEL</div><b id="wifiChannel">--</b>
+              <div>CLIENTS</div><b id="wifiClients">--</b>
+            </div>
+            <div id="wifiClientList" class="clientList muted">Wi-Fi is read only when requested.</div>
+          </article>
+
+          <article class="card">
+            <div class="cardTop">
+              <div>
+                <div class="cardEyebrow">APPLIANCE</div>
+                <h2>Settings</h2>
+              </div>
+              <div class="futurePill">LAYOUT ONLY</div>
+            </div>
+
+            <div class="settingsRows">
+              <div class="settingRow"><span>LOOP</span><b>--</b></div>
+              <div class="settingRow"><span>SOFTWARE VERSION</span><b>--</b></div>
+              <div class="settingRow"><span>UPDATE STATUS</span><b>--</b></div>
+              <div class="settingRow"><span>RESET SETTINGS</span><b>--</b></div>
+            </div>
+            <div class="cardNote">Controls will be wired when the System functions are implemented.</div>
+          </article>
+        </div>
+      </section>
+    </main>
   </section>
-
-  <footer>
-    <a href="/">← CONTROLLER</a>
-    <span>PRISMA-PI LITE · ADMIN MINIMAL</span>
-  </footer>
-</main>
+</div>
 <script src="/admin.js"></script>
 </body>
 </html>
