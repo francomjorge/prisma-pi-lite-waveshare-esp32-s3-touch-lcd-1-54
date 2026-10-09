@@ -22,6 +22,17 @@ assert "flex:0 0 25%" in style
 assert "Math.min(3,n)" in index
 assert "pg*25" in index
 
+# Desktop navigation: keyboard only, no visible previous/next controls.
+assert "addEventListener('keydown'" in index
+assert "e.key==='ArrowLeft'" in index
+assert "e.key==='ArrowRight'" in index
+assert "e.repeat" in index
+assert "page(pg-1)" in index
+assert "page(pg+1)" in index
+assert "isRealFs()||fsFrame.classList.contains('pseudoFull')" in index
+assert 'class="navLeft"' not in index
+assert 'class="navRight"' not in index
+
 assert '"web/index.html"' in cmake
 assert '"web/style.css"' in cmake
 assert '"web/app.js"' not in cmake
@@ -93,4 +104,4 @@ assert "esp_timer" not in cmake
 assert "hc.lru_purge_enable=true" in portal
 assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-print("v5.0 OK: NO_WF / NO_ADMIN / STABLE + global sync + black OFF + clean fullscreen UI")
+print("v1.0 OK: stable controller + desktop arrow navigation + global sync + black OFF + clean fullscreen UI")
