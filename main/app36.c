@@ -18,51 +18,36 @@
 #undef mode_index
 #undef synth_on
 
-static const char *SYNC_TAG = "BUILD58_SYNC";
+static const char *SYNC_TAG = "PAGE2_DIRECT";
 
-/* Build 58 pattern: appliance variables are the authority and are mirrored
- * into the HTTP state object every 100 ms. No web-to-appliance control path. */
-static void mirror_task(void *arg)
+/* Authoritative Page 2 getters. wifi_portal.c reads these values directly
+ * on every /api/state request: no mirror task and no duplicated state. */
+bool prisma_appliance_get_on(void)
 {
-    bool last_on = !prisma_shared_on;
-    int last_mode = -1;
-    int last_intensity = -1;
+    return prisma_shared_on;
+}
 
-    for (;;) {
-        prisma_control_set_on(prisma_shared_on);
-        prisma_control_set_mode(prisma_shared_mode ? 1 : 0);
-        prisma_control_set_intensity(prisma_shared_intensity);
+int prisma_appliance_get_mode(void)
+{
+    return prisma_shared_mode ? 1 : 0;
+}
 
-        if (last_on != prisma_shared_on ||
-            last_mode != prisma_shared_mode ||
-            last_intensity != prisma_shared_intensity) {
-            ESP_LOGI(SYNC_TAG,
-                     "MIRROR TX on=%s intensity=%d mode=%s",
-                     prisma_shared_on ? "ON" : "OFF",
-                     prisma_shared_intensity,
-                     prisma_shared_mode ? "BYPASS" : "RANDOM");
-            last_on = prisma_shared_on;
-            last_mode = prisma_shared_mode;
-            last_intensity = prisma_shared_intensity;
-        }
+int prisma_appliance_get_intensity(void)
+{
+    return prisma_shared_intensity;
+}
 
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
+const char *prisma_appliance_get_filename(void)
+{
+    return prisma_storage_current();
 }
 
 void app_main(void)
 {
     prisma_shared_mode = 0;
     prisma_shared_intensity = 61;
-
-    prisma_control_set_on(prisma_shared_on);
-    prisma_control_set_mode(prisma_shared_mode);
-    prisma_control_set_intensity(prisma_shared_intensity);
-
     prisma_storage_init();
-    prisma_control_set_filename(prisma_storage_current());
 
-    ESP_LOGI(SYNC_TAG, "BUILD58 READ-ONLY PAGE2 SYNC ACTIVE");
-    xTaskCreate(mirror_task, "prisma_mirror", 3072, NULL, 4, NULL);
+    ESP_LOGI(SYNC_TAG, "DIRECT READ-ONLY PAGE2 STATE ACTIVE");
     prisma_legacy_main();
 }
