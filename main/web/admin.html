@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PRISMA-PI LITE / ADMIN</title>
+<link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+<main class="shell">
+  <header class="top">
+    <div>
+      <div class="brand">PRISMA<span>-PI</span></div>
+      <div class="sub">LITE / ADMIN</div>
+    </div>
+    <div class="mode">READ ONLY · ZERO POLLING</div>
+  </header>
+
+  <section class="intro">
+    <div class="eyebrow">APPLIANCE OVERVIEW</div>
+    <h1>ADMIN</h1>
+    <p>Only essential appliance information. Storage is captured once per boot. Wi-Fi is checked only on demand.</p>
+  </section>
+
+  <section class="cards">
+    <article class="card wifiCard">
+      <div class="cardHead">
+        <div>
+          <div class="label">WI-FI</div>
+          <div id="wifiState" class="value compact">NOT CHECKED</div>
+        </div>
+        <button id="wifiCheck" class="button" type="button">CHECK WI-FI</button>
+      </div>
+      <div class="details">
+        <div><span>SSID</span><b id="wifiSsid">--</b></div>
+        <div><span>IP</span><b id="wifiIp">--</b></div>
+        <div><span>Channel</span><b id="wifiChannel">--</b></div>
+        <div><span>Clients</span><b id="wifiClients">--</b></div>
+      </div>
+      <div id="wifiClientList" class="list muted">No Wi-Fi request has been made.</div>
+    </article>
+
+    <article class="card">
+      <div class="label">STORAGE FREE</div>
+      <div id="storageFree" class="value">--</div>
+      <div id="storageMeta" class="muted">Loading boot snapshot…</div>
+      <div class="bar"><div id="storageBar" class="barFill"></div></div>
+      <div class="note">Calculated once per appliance boot.</div>
+    </article>
+
+    <article class="card">
+      <div class="label">MEDIA FILES</div>
+      <div id="mediaCount" class="value">--</div>
+      <div id="mediaList" class="list"><div class="file muted">Loading boot snapshot…</div></div>
+    </article>
+  </section>
+
+  <footer>
+    <a href="/">← CONTROLLER</a>
+    <span>PRISMA-PI LITE · ADMIN MINIMAL</span>
+  </footer>
+</main>
+<script src="/admin.js"></script>
+</body>
+</html>
