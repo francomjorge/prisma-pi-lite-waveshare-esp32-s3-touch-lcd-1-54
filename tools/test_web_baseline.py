@@ -51,7 +51,6 @@ assert "'/api/state?ts='+Date.now()" in index
 assert "new XMLHttpRequest()" in index
 assert "syncBusy" in index
 assert "scheduleSync(300)" in index
-assert "if(pg!==1)" not in index
 assert "setInterval(syncAll" not in index
 
 assert "function drawPage2(s)" in index
@@ -62,17 +61,29 @@ assert "Array.isArray(s.effects)" in index
 assert "Array.isArray(s.values)" in index
 assert "fxmirror" in index
 
+# Original Live View must keep its source image and controls.
+assert 'id="photoFrame"' in index
 assert 'id="sourcePreview"' in index
 assert 'id="fsBtn"' in index
 assert '"/source/*"' in portal
 assert "setSource(s.filename)" in index
-assert "photo.classList.toggle('off',!s.on)" in index
+assert "sourcePreview.src='/source/'+encodeURIComponent(f)+'?v='+Date.now()" in index
+assert "sourcePreview.onload=function(){sourcePreview.style.visibility='visible';applyPreviewRotation();renderFxLab()}" in index
+assert "if(fsFrame)fsFrame.classList.toggle('off',!s.on)" in index
+assert "function applyPreviewRotation()" in index
+assert "function rotatePreview()" in index
+assert "previewRotation=(previewRotation+90)%360" in index
+assert "window.addEventListener('resize',applyPreviewRotation)" in index
+assert "document.addEventListener('keydown'" in index
+assert "e.key==='ArrowLeft'" in index
+assert "e.key==='ArrowRight'" in index
+assert "(e.key==='r'||e.key==='R')&&pg===2" in index
+assert "function toggleFs()" in index
+assert "requestFullscreen" in index
 
 assert ".photo.off{background:#000!important}" in style
 assert ".photo.off #offscreen{display:none!important}" in style
 assert ".photo.off canvas,.photo.off .sourcePreview{visibility:hidden!important;opacity:0!important}" in style
-
-# Existing fullscreen control remains untouched on the original Live View.
 assert ".photo .fsBtn{" in style
 assert "opacity:0" in style
 assert ".photo .fsBtn::after{content:\"⛶\"" in style
@@ -82,10 +93,14 @@ assert ".photo:focus-within .fsBtn" in style
 assert "PRISMA-PI LITE 5.0" in version
 assert "STABLE" in version
 
-# Page 5 is an isolated browser FX lab. Debug API and timers remain forbidden.
+# Page 5 stays isolated and uses the same already-loaded image.
 assert "PAGE 5" in index
 assert "FX LAB / TEST LIVE VIEW" in index
 assert 'id="d4"' in index
+assert 'id="labCanvas"' in index
+assert "new Image()" not in index
+assert index.count("'/api/state?ts='+Date.now()") == 1
+assert index.count("/source/") == 1
 assert "api/debug/state" not in index
 assert '"/api/debug/state"' not in portal
 assert "esp_timer" not in cmake
@@ -93,4 +108,4 @@ assert "esp_timer" not in cmake
 assert "hc.lru_purge_enable=true" in portal
 assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-print("Controller OK: original surfaces + page 5 isolated FX lab + global sync")
+print("Controller OK: 5 pages + restored Live View image/keys/rotate/fullscreen + isolated FX lab")
