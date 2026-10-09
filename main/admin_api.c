@@ -14,6 +14,7 @@
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "prisma_metrics.h"
+#include "prisma_sensors.h"
 #include "storage.h"
 
 #define ADMIN_MAX_SOURCES 32
@@ -41,9 +42,16 @@ static esp_err_t send_embedded(httpd_req_t *r, const char *type, const uint8_t *
     return httpd_resp_send(r, (const char *)s, (ssize_t)(e - s));
 }
 
-static esp_err_t admin_page_get(httpd_req_t *r){return send_embedded(r,"text/html",web_admin_html_start,web_admin_html_end);}
-static esp_err_t admin_css_get(httpd_req_t *r){return send_embedded(r,"text/css",web_admin_css_start,web_admin_css_end);}
-static esp_err_t admin_js_get(httpd_req_t *r){return send_embedded(r,"application/javascript",web_admin_js_start,web_admin_js_end);}
+static esp_err_t send_json(httpd_req_t *r, const char *json, int len)
+{
+    httpd_resp_set_type(r, "application/json");
+    no_cache(r);
+    return httpd_resp_send(r, json, len);
+}
+
+static esp_err_t admin_page_get(httpd_req_t*r){return send_embedded(r,"text/html",web_admin_html_start,web_admin_html_end);}
+static esp_err_t admin_css_get(httpd_req_t*r){return send_embedded(r,"text/css",web_admin_css_start,web_admin_css_end);}
+static esp_err_t admin_js_get(httpd_req_t*r){return send_embedded(r,"application/javascript",web_admin_js_start,web_admin_js_end);}
 
 static const char *reset_reason_name(esp_reset_reason_t reason)
 {
@@ -62,28 +70,121 @@ static const char *reset_reason_name(esp_reset_reason_t reason)
     }
 }
 
+static void get_ap_ip(char *ipbuf, size_t size)
+{
+    snprintf(ipbuf, size, "192.168.4.1");
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+    if (netif) {
+        esp_netif_ip_info_t ip = {0};
+        if (esp_netif_get_ip_info(netif, &ip) == ESP_OK)
+            snprintf(ipbuf, size, IPSTR, IP2STR(&ip.ip));
+    }
+}
+
 static esp_err_t admin_overview_get(httpd_req_t *r)
 {
     int batt_mv = 0, batt_pct = 0;
     bool battery = prisma_metrics_battery(&batt_mv, &batt_pct);
+    bool charging = false;
+    bool charging_known = prisma_metrics_charging(&charging);
+    float chip_temp = 0.0f;
+    bool temp_ok = prisma_metrics_chip_temperature(&chip_temp);
     const esp_app_desc_t *app = esp_app_get_description();
     uint64_t uptime_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
-    char b[768];
+    char b[1024];
     int n = snprintf(b, sizeof(b),
         "{\"version\":\"PRISMA-PI LITE v1.1 ADMIN RO\","
         "\"idf\":\"%s\",\"build_date\":\"%s\",\"build_time\":\"%s\","
         "\"uptime_ms\":%llu,\"heap_free\":%u,\"heap_min\":%u,"
-        "\"reset_reason\":\"%s\","
-        "\"battery\":{\"present\":%s,\"mv\":%d,\"percent\":%d,\"estimated\":true}}",
+        "\"reset_reason\":\"%s\",\"flash_bytes\":%u,\"psram_bytes\":%u,"
+        "\"chip_temp\":{\"present\":%s,\"c\":%.1f},"
+        "\"battery\":{\"present\":%s,\"mv\":%d,\"percent\":%d,\"estimated\":true,"
+        "\"charging_known\":%s,\"charging\":%s}}",
         esp_get_idf_version(), app ? app->date : "", app ? app->time : "",
         (unsigned long long)uptime_ms, (unsigned)esp_get_free_heap_size(),
         (unsigned)esp_get_minimum_free_heap_size(), reset_reason_name(esp_reset_reason()),
-        battery ? "true" : "false", battery ? batt_mv : 0, battery ? batt_pct : 0);
+        (unsigned)prisma_metrics_flash_size(), (unsigned)prisma_metrics_psram_size(),
+        temp_ok ? "true" : "false", temp_ok ? chip_temp : 0.0f,
+        battery ? "true" : "false", battery ? batt_mv : 0, battery ? batt_pct : 0,
+        charging_known ? "true" : "false", charging_known && charging ? "true" : "false");
     if (n < 0 || n >= (int)sizeof(b))
         return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "overview overflow");
-    httpd_resp_set_type(r, "application/json");
-    no_cache(r);
-    return httpd_resp_send(r, b, n);
+    return send_json(r, b, n);
+}
+
+/* One compact endpoint for the Overview. It deliberately does not depend on the browser
+ * successfully chaining four separate requests before showing useful information. */
+static esp_err_t admin_status_get(httpd_req_t *r)
+{
+    const esp_app_desc_t *app = esp_app_get_description();
+    uint64_t uptime_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+
+    int batt_mv = 0, batt_pct = 0;
+    bool battery = prisma_metrics_battery(&batt_mv, &batt_pct);
+    bool charging = false;
+    bool charging_known = prisma_metrics_charging(&charging);
+    float chip_temp = 0.0f;
+    bool temp_ok = prisma_metrics_chip_temperature(&chip_temp);
+
+    size_t storage_total = 0, storage_used = 0;
+    bool storage_ok = esp_spiffs_info("storage", &storage_total, &storage_used) == ESP_OK;
+    size_t storage_free = storage_total > storage_used ? storage_total - storage_used : 0;
+
+    wifi_config_t cfg = {0};
+    bool wifi_ok = esp_wifi_get_config(WIFI_IF_AP, &cfg) == ESP_OK;
+    uint8_t channel = 0;
+    wifi_second_chan_t second = WIFI_SECOND_CHAN_NONE;
+    if (wifi_ok) esp_wifi_get_channel(&channel, &second);
+    wifi_sta_list_t stations = {0};
+    if (wifi_ok) esp_wifi_ap_get_sta_list(&stations);
+    char ipbuf[20];
+    get_ap_ip(ipbuf, sizeof(ipbuf));
+
+    char b[1792];
+    int n = snprintf(b, sizeof(b),
+        "{\"ok\":true,\"version\":\"PRISMA-PI LITE v1.1 ADMIN RO\","
+        "\"idf\":\"%s\",\"build_date\":\"%s\",\"build_time\":\"%s\","
+        "\"uptime_ms\":%llu,\"heap_free\":%u,\"heap_min\":%u,\"reset_reason\":\"%s\","
+        "\"flash_bytes\":%u,\"psram_bytes\":%u,"
+        "\"temperature\":{\"present\":%s,\"c\":%.1f},"
+        "\"battery\":{\"present\":%s,\"mv\":%d,\"percent\":%d,\"charging_known\":%s,\"charging\":%s},"
+        "\"wifi\":{\"ok\":%s,\"ssid\":\"%s\",\"ip\":\"%s\",\"channel\":%u,\"clients\":%u,\"max_clients\":%u},"
+        "\"storage\":{\"ok\":%s,\"total\":%u,\"used\":%u,\"free\":%u,\"sources\":%d},"
+        "\"imu\":{\"present\":%s}}",
+        esp_get_idf_version(), app ? app->date : "", app ? app->time : "",
+        (unsigned long long)uptime_ms, (unsigned)esp_get_free_heap_size(),
+        (unsigned)esp_get_minimum_free_heap_size(), reset_reason_name(esp_reset_reason()),
+        (unsigned)prisma_metrics_flash_size(), (unsigned)prisma_metrics_psram_size(),
+        temp_ok ? "true" : "false", temp_ok ? chip_temp : 0.0f,
+        battery ? "true" : "false", battery ? batt_mv : 0, battery ? batt_pct : 0,
+        charging_known ? "true" : "false", charging_known && charging ? "true" : "false",
+        wifi_ok ? "true" : "false", wifi_ok ? (char *)cfg.ap.ssid : "", ipbuf, (unsigned)channel,
+        wifi_ok ? (unsigned)stations.num : 0, wifi_ok ? (unsigned)cfg.ap.max_connection : 0,
+        storage_ok ? "true" : "false", (unsigned)storage_total, (unsigned)storage_used,
+        (unsigned)storage_free, prisma_storage_count(),
+        prisma_sensors_imu_ready() ? "true" : "false");
+    if (n < 0 || n >= (int)sizeof(b))
+        return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "status overflow");
+    return send_json(r, b, n);
+}
+
+static esp_err_t admin_sensors_get(httpd_req_t *r)
+{
+    prisma_imu_data_t d = {0};
+    bool ready = prisma_sensors_imu_ready();
+    bool valid = ready && prisma_sensors_read_imu(&d);
+    char b[512];
+    int n = snprintf(b, sizeof(b),
+        "{\"present\":%s,\"valid\":%s,"
+        "\"acc\":{\"x\":%d,\"y\":%d,\"z\":%d},"
+        "\"gyro\":{\"x\":%d,\"y\":%d,\"z\":%d},"
+        "\"angle\":{\"x\":%.1f,\"y\":%.1f,\"z\":%.1f}}",
+        ready ? "true" : "false", valid ? "true" : "false",
+        d.acc_x, d.acc_y, d.acc_z, d.gyr_x, d.gyr_y, d.gyr_z,
+        d.angle_x, d.angle_y, d.angle_z);
+    if (n < 0 || n >= (int)sizeof(b))
+        return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "sensors overflow");
+    return send_json(r, b, n);
 }
 
 static bool is_jpeg(const char *name)
@@ -175,13 +276,8 @@ static esp_err_t admin_network_get(httpd_req_t *r)
     wifi_sta_list_t stations = {0};
     esp_wifi_ap_get_sta_list(&stations);
 
-    char ipbuf[20] = "192.168.4.1";
-    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
-    if (netif) {
-        esp_netif_ip_info_t ip = {0};
-        if (esp_netif_get_ip_info(netif, &ip) == ESP_OK)
-            snprintf(ipbuf, sizeof(ipbuf), IPSTR, IP2STR(&ip.ip));
-    }
+    char ipbuf[20];
+    get_ap_ip(ipbuf, sizeof(ipbuf));
 
     httpd_resp_set_type(r, "application/json");
     no_cache(r);
@@ -215,12 +311,16 @@ void prisma_admin_register(httpd_handle_t server)
     httpd_uri_t css = {.uri="/admin.css",.method=HTTP_GET,.handler=admin_css_get};
     httpd_uri_t js = {.uri="/admin.js",.method=HTTP_GET,.handler=admin_js_get};
     httpd_uri_t overview = {.uri="/api/admin/overview",.method=HTTP_GET,.handler=admin_overview_get};
+    httpd_uri_t status = {.uri="/api/admin/status",.method=HTTP_GET,.handler=admin_status_get};
+    httpd_uri_t sensors = {.uri="/api/admin/sensors",.method=HTTP_GET,.handler=admin_sensors_get};
     httpd_uri_t storage = {.uri="/api/admin/storage",.method=HTTP_GET,.handler=admin_storage_get};
     httpd_uri_t network = {.uri="/api/admin/network",.method=HTTP_GET,.handler=admin_network_get};
     httpd_register_uri_handler(server, &page);
     httpd_register_uri_handler(server, &css);
     httpd_register_uri_handler(server, &js);
     httpd_register_uri_handler(server, &overview);
+    httpd_register_uri_handler(server, &status);
+    httpd_register_uri_handler(server, &sensors);
     httpd_register_uri_handler(server, &storage);
     httpd_register_uri_handler(server, &network);
 }
