@@ -1,0 +1,6 @@
+PRISMA-PI LITE v1.1
+ADMIN READ-ONLY / PHASE 1
+
+Base: PRISMA-PI LITE v1.0 STABLE FINAL
+Adds /admin read-only dashboard, responsive sidebar/mobile menu, local skin architecture, live view extension, storage/network/system/power telemetry.
+No administration writes are enabled in this phase.
