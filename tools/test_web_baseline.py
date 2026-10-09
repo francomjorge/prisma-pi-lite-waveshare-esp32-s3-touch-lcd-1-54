@@ -43,8 +43,8 @@ for symbol in (
     assert symbol in portal, f"state API not using {symbol}"
 
 assert '"/api/state"' in portal
-assert '"effects"' in portal
-assert '"values"' in portal
+assert '\\"effects\\"' in portal
+assert '\\"values\\"' in portal
 assert "char b[640]" in portal
 
 # Browser must use one serialized polling loop regardless of selected page.
