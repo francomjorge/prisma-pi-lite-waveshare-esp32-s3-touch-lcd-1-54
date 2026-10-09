@@ -10,7 +10,7 @@ portal = (root / "main/wifi_portal.c").read_text(encoding="utf-8")
 cmake = (root / "main/CMakeLists.txt").read_text(encoding="utf-8")
 version = (root / "VERSION_1.1.txt").read_text(encoding="utf-8")
 
-for section in ("overview","live","storage","network","power","sensors","system","diagnostics","appearance"):
+for section in ("overview","live","parameters","storage","network","power","sensors","system","diagnostics","appearance"):
     assert f'id="sec-{section}"' in admin, section
     assert f'data-section="{section}"' in admin, section
 
@@ -23,6 +23,17 @@ assert 'UPLOAD DISABLED' in admin
 assert 'QMI8658' in admin
 assert '512 KiB' in admin and '256 KiB' in admin and '>32<' in admin
 
+# First read-only parameter surface reuses the authoritative controller state.
+for field in ('paPower','paMode','paIntensity','paSource','paGeneration'):
+    assert f'id="{field}"' in admin
+for i in range(6):
+    assert f'id="paFx{i}"' in admin
+    assert f'id="paVal{i}"' in admin
+assert 'function drawParameters(s)' in js
+assert 'drawParameters(s)' in js
+assert 'Array.isArray(s.effects)' in js
+assert 'Array.isArray(s.values)' in js
+
 assert '@media(max-width:720px)' in css
 assert 'body.menuOpen .sidebar' in css
 assert 'html[data-theme="alt"]' in css
@@ -32,6 +43,9 @@ assert '.wideBtn{' in css
 for endpoint in ('/api/state','/api/admin/overview','/api/admin/storage','/api/admin/network'):
     assert endpoint in js or endpoint in api
 assert "e.key==='r'||e.key==='R'" in js
+assert "e.key==='f'||e.key==='F'" in js
+assert 'function toggleAdminFs()' in js
+assert 'F FULLSCREEN' in admin
 assert 'localStorage' in js
 
 assert '.uri="/admin"' in api
@@ -56,4 +70,4 @@ assert '"admin_api.c"' in cmake and '"prisma_metrics.c"' in cmake
 assert 'esp_adc' in cmake
 assert 'ADMIN READ-ONLY / PHASE 1' in version
 
-print('v1.1 admin OK: read-only dashboard + responsive navigation + skins + real telemetry + complete JSON streams')
+print('v1.1 admin OK: read-only dashboard + parameters + F fullscreen + responsive navigation + skins + real telemetry')
