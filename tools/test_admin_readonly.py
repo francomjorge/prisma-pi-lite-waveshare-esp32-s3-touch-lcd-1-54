@@ -63,7 +63,7 @@ assert 'BAT_ADC_CHANNEL ADC_CHANNEL_0' in metrics
 assert 'BAT_DIVIDER_X1000 3000' in metrics
 assert 'temperature_sensor_get_celsius' in metrics
 assert 'esp_flash_get_size' in metrics
-assert 'esp_psram_get_size' in metrics
+assert 'heap_caps_get_total_size(MALLOC_CAP_SPIRAM)' in metrics
 
 # QMI8658 shares the already-created touchscreen I2C bus, like the factory example.
 assert 'QMI8658_ADDR       0x6B' in sensors
