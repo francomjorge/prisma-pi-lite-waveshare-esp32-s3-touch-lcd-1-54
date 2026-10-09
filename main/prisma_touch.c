@@ -42,3 +42,5 @@ bool prisma_touch_read(uint16_t *x,uint16_t *y){
  if(*y>239){*y=239;}
  return true;
 }
+
+i2c_master_bus_handle_t prisma_touch_i2c_bus(void){return bus;}
