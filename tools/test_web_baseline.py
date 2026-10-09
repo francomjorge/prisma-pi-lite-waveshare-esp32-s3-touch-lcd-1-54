@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
+import hashlib
 import re
 
 root = Path(__file__).resolve().parents[1]
@@ -9,6 +10,7 @@ cmake = (root / "main/CMakeLists.txt").read_text(encoding="utf-8")
 portal = (root / "main/wifi_portal.c").read_text(encoding="utf-8")
 header = (root / "main/wifi_portal.h").read_text(encoding="utf-8")
 wrapper = (root / "main/app36.c").read_text(encoding="utf-8")
+version = (root / "VERSION_5.0.txt").read_text(encoding="utf-8")
 
 EXPECTED_PAGES = 4
 pages = len(re.findall(r'<section\s+class="page(?:\s|\")', index))
@@ -76,6 +78,29 @@ assert ".photo.off{background:#000!important}" in style
 assert ".photo.off #offscreen{display:none!important}" in style
 assert ".photo.off canvas,.photo.off .sourcePreview{visibility:hidden!important;opacity:0!important}" in style
 
+# v5.0 fullscreen control is icon-only and hidden until hover/focus/touch interaction.
+assert ".photo .fsBtn{" in style
+assert "opacity:0" in style
+assert ".photo .fsBtn::after{content:\"⛶\"" in style
+assert ".photo:hover .fsBtn" in style
+assert ".photo:focus-within .fsBtn" in style
+
+# Release identity and scope.
+assert "PRISMA-PI LITE 5.0" in version
+assert "NO EFFECT / NO ADMIN" in version
+
+# The controller release must ship the validated 300x400 source assets.
+expected_assets = {
+    "F1_MOON.JPG": "a2fb8ad4b978dea8182742777bba59764ada0c38bde050866d02d49950d22b84",
+    "F1_TANGO.JPG": "9788e4d2aa294db8662dec2c5b4b35f469b6fc489f0bbd4039bd9c6e7171b5ec",
+}
+for name, expected_sha256 in expected_assets.items():
+    data = (root / "storage" / name).read_bytes()
+    assert len(data) > 20000, f"{name} unexpectedly small ({len(data)} bytes)"
+    assert data.startswith(b"\xff\xd8") and data.endswith(b"\xff\xd9"), f"{name} is not a complete JPEG"
+    actual = hashlib.sha256(data).hexdigest()
+    assert actual == expected_sha256, f"{name} SHA256 mismatch: {actual}"
+
 # Page 5 / Sync Lab must remain removed.
 assert "PAGE 5" not in index
 assert "SYNC LAB" not in index
@@ -88,4 +113,4 @@ assert "esp_timer" not in cmake
 assert "hc.lru_purge_enable=true" in portal
 assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-print("M4.11 OK: stable controller baseline + global sync + black OFF Live View")
+print("v5.0 OK: No Effect / No Admin + global sync + verified assets + black OFF + clean fullscreen UI")
