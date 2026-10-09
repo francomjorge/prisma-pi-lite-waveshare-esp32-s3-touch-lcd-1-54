@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <stdint.h>
 #include "wifi_portal.h"
+#include "admin_api.h"
 #include "esp_event.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
@@ -195,8 +196,9 @@ static void start_portal(void)
         httpd_register_uri_handler(s,&b);
         httpd_register_uri_handler(s,&c);
         httpd_register_uri_handler(s,&d);
+        prisma_admin_register(s);
     }
-    ESP_LOGI(TAG,"PRISMA LITE M4.9 Global Web Sync: %s - http://192.168.4.1",ap);
+    ESP_LOGI(TAG,"PRISMA LITE M4.9 Global Web Sync + Minimal Admin: %s - http://192.168.4.1",ap);
 }
 
 void prisma_wifi_start(void)
