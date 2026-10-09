@@ -2,6 +2,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "storage.h"
+#include "prisma_power.h"
 
 #define synth_on prisma_shared_on
 #define mode_index prisma_shared_mode
@@ -62,8 +63,11 @@ void app_main(void)
 {
     prisma_shared_mode = 0;
     prisma_shared_intensity = 61;
+
+    /* PWR: 2 s + release = restart; 3 s hold = off/on. */
+    prisma_power_init();
     prisma_storage_init();
 
-    ESP_LOGI(SYNC_TAG, "M4.9 GLOBAL WEB SYNC ACTIVE - DIRECT APPLIANCE GETTERS");
+    ESP_LOGI(SYNC_TAG, "PRISMA-PI LITE v1.0 STABLE - GLOBAL WEB SYNC + PHYSICAL POWER");
     prisma_legacy_main();
 }
