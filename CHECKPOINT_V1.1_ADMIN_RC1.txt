@@ -1,0 +1,5 @@
+PRISMA-PI LITE v1.1 ADMIN READ-ONLY RC1
+
+Hardware-validated by user on 2026-10-09.
+Admin page loads correctly and does not regress the existing controller/web behavior.
+This checkpoint precedes keyboard F fullscreen and the first read-only Parameters panel.
