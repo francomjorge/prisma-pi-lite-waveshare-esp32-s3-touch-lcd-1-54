@@ -1,15 +1,9 @@
 (function(){
 'use strict';
 
+var titles={live:'LIVE VIEW EXTENDED',sensors:'SENSORS',system:'SYSTEM'};
 function q(id){return document.getElementById(id)}
 function text(id,value){var el=q(id);if(el)el.textContent=value}
-function bytes(n){
-  n=Number(n)||0;
-  if(n>=1073741824)return (n/1073741824).toFixed(2)+' GiB';
-  if(n>=1048576)return (n/1048576).toFixed(n>=10485760?1:2)+' MiB';
-  if(n>=1024)return (n/1024).toFixed(1)+' KiB';
-  return n+' B';
-}
 function getJson(url,ok,fail){
   var x=new XMLHttpRequest();
   x.open('GET',url+(url.indexOf('?')<0?'?':'&')+'ts='+Date.now(),true);
@@ -24,37 +18,21 @@ function getJson(url,ok,fail){
   x.send(null);
 }
 
-function renderStorage(s){
-  var total=Number(s.total)||0;
-  var free=Number(s.free)||0;
-  var used=Number(s.used)||0;
-  var pct=total>0?Math.max(0,Math.min(100,(free/total)*100)):0;
-  text('storageFree',bytes(free));
-  text('storageMeta',bytes(used)+' used · '+bytes(total)+' total · boot snapshot');
-  var bar=q('storageBar');if(bar)bar.style.width=pct.toFixed(1)+'%';
-
-  var files=Array.isArray(s.files)?s.files:[];
-  text('mediaCount',String(Number(s.media_count)||files.length));
-  var list=q('mediaList');
-  if(!list)return;
-  list.innerHTML='';
-  if(!files.length){
-    var empty=document.createElement('div');empty.className='file muted';empty.textContent='No media files in storage.';list.appendChild(empty);return;
-  }
-  files.forEach(function(f){
-    var row=document.createElement('div');row.className='file';
-    var name=document.createElement('span');name.textContent=f.name||'unnamed';
-    var size=document.createElement('b');size.textContent=bytes(f.size);
-    row.appendChild(name);row.appendChild(size);list.appendChild(row);
-  });
+function openSection(name){
+  if(!titles[name])return;
+  var sections=document.querySelectorAll('.section');
+  var buttons=document.querySelectorAll('.navBtn');
+  for(var i=0;i<sections.length;i++)sections[i].classList.toggle('on',sections[i].id==='sec-'+name);
+  for(var j=0;j<buttons.length;j++)buttons[j].classList.toggle('on',buttons[j].getAttribute('data-section')===name);
+  text('pageTitle',titles[name]);
+  document.body.classList.remove('menuOpen');
 }
 
-function storageError(){
-  text('storageFree','ERROR');
-  text('storageMeta','Boot snapshot unavailable.');
-  text('mediaCount','--');
-  var list=q('mediaList');if(list)list.innerHTML='<div class="file error">Storage snapshot unavailable.</div>';
-}
+var nav=document.querySelectorAll('.navBtn');
+for(var i=0;i<nav.length;i++)nav[i].onclick=function(){openSection(this.getAttribute('data-section'))};
+
+var menu=q('menuBtn');if(menu)menu.onclick=function(){document.body.classList.toggle('menuOpen')};
+var overlay=q('overlay');if(overlay)overlay.onclick=function(){document.body.classList.remove('menuOpen')};
 
 function renderWifi(w){
   text('wifiState','READY');
@@ -63,12 +41,14 @@ function renderWifi(w){
   text('wifiIp',w.ip||'--');
   text('wifiChannel',String(w.channel==null?'--':w.channel));
   text('wifiClients',String(w.client_count==null?'--':w.client_count));
+
   var list=q('wifiClientList');
   if(!list)return;
-  list.className='list';list.innerHTML='';
+  list.className='clientList';
+  list.innerHTML='';
   var clients=Array.isArray(w.clients)?w.clients:[];
   if(!clients.length){
-    var none=document.createElement('div');none.className='client muted';none.textContent='No connected clients.';list.appendChild(none);return;
+    var none=document.createElement('div');none.className='muted';none.textContent='No connected clients.';list.appendChild(none);return;
   }
   clients.forEach(function(c){
     var row=document.createElement('div');row.className='client';
@@ -81,7 +61,7 @@ function renderWifi(w){
 function wifiError(){
   text('wifiState','ERROR');
   var state=q('wifiState');if(state){state.classList.remove('ok');state.classList.add('error')}
-  var list=q('wifiClientList');if(list){list.className='list error';list.textContent='Wi-Fi status unavailable.'}
+  var list=q('wifiClientList');if(list){list.className='clientList error';list.textContent='Wi-Fi status unavailable.'}
 }
 
 function checkWifi(){
@@ -91,10 +71,7 @@ function checkWifi(){
   getJson('/api/admin/network',function(w){renderWifi(w);if(button){button.disabled=false;button.textContent='CHECK WI-FI'}},function(){wifiError();if(button){button.disabled=false;button.textContent='CHECK WI-FI'}});
 }
 
-var button=q('wifiCheck');if(button)button.onclick=checkWifi;
+var wifi=q('wifiCheck');if(wifi)wifi.onclick=checkWifi;
 
-/* One request on page load. Endpoint returns RAM cache and never rescans SPIFFS. */
-getJson('/api/admin/storage',renderStorage,storageError);
-
-/* Intentionally no recurring polling or background telemetry. */
+/* No automatic device reads. Live View Extended and Sensors are layout-only placeholders. */
 })();
