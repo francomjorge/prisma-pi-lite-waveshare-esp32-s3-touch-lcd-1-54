@@ -1,0 +1,8 @@
+PRISMA-PI LITE 5.0 — NO EFFECT / NO ADMIN
+
+Stable controller baseline.
+Global read-only synchronization: Page 2 + Page 4 + Live View.
+Validated MOON/TANGO filesystem assets.
+OFF state produces black/no-signal Live View.
+No effect processing in this release.
+No administration functionality in this release.
