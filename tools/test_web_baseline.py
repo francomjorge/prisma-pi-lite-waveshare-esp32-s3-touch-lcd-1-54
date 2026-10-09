@@ -46,6 +46,12 @@ assert "requestAnimationFrame(applyPreviewRotation)" in index
 assert "window.addEventListener('resize',applyPreviewRotation)" in index
 assert "R ROTATE" in index
 
+# Live View keyboard fullscreen: F toggles in and out, using the existing fullscreen path.
+assert "e.key==='f'||e.key==='F'" in index
+assert "toggleFs();return" in index
+assert "F FULLSCREEN" in index
+assert "pg===2||isRealFs()||fsFrame.classList.contains('pseudoFull')" in index
+
 assert '"web/index.html"' in cmake
 assert '"web/style.css"' in cmake
 assert '"web/app.js"' not in cmake
@@ -120,4 +126,4 @@ assert "esp_timer" in cmake
 assert "hc.lru_purge_enable=true" in portal
 assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-print("v1.0 controller OK inside v1.1: arrows + R rotation + global sync + black OFF + clean fullscreen UI")
+print("v1.0 controller OK inside v1.1: arrows + R rotation + F fullscreen + global sync + black OFF + clean fullscreen UI")
