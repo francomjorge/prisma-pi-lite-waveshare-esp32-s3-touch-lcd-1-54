@@ -15,44 +15,12 @@
 <section class="page"><div id="controls"><div class="card"><div class="row"><div id="sourceSelect" class="sourceSelect" data-control="1"><div class="label">NOW PLAYING</div><div id="filename" class="value">F1_MOON.JPG</div></div><div id="power" class="power" data-control="1">ON</div></div></div><div class="card"><div class="row compact"><div class="label stronglabel">INTENSITY</div><div id="pct" class="intensityValue">61%</div></div><div id="intensityBar" class="bar" data-control="1"><div id="fill" class="fill"></div></div></div><div class="card modecard"><div class="label stronglabel">MODE</div><div id="mode" class="mode" data-control="1">RANDOM</div></div></div></section>
 <section class="page"><div id="photoFrame" class="photo"><img id="sourcePreview" class="sourcePreview" alt="PRISMA source preview"><div id="offscreen">SYNTH OFF</div><button id="fsBtn" class="fsBtn" type="button">FULL SCREEN</button></div><div class="hint photoHint">VISUAL MONITOR / READ ONLY</div></section>
 <section class="page"><div id="effects" class="effects"><div id="fx0" class="fxrow off"><div class="fxline"><div class="fxname">PIXEL</div><div id="fxv0" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill0" class="fxfill"></div></div></div><div id="fx1" class="fxrow off"><div class="fxline"><div class="fxname">GLITCH</div><div id="fxv1" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill1" class="fxfill"></div></div></div><div id="fx2" class="fxrow off"><div class="fxline"><div class="fxname">POSTER</div><div id="fxv2" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill2" class="fxfill"></div></div></div><div id="fx3" class="fxrow off"><div class="fxline"><div class="fxname">HUE</div><div id="fxv3" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill3" class="fxfill"></div></div></div><div id="fx4" class="fxrow off mirrorRow"><div class="fxline"><div class="fxname">MIRROR</div><div id="fxmirror" class="fxswitch off">OFF</div></div></div><div id="fx5" class="fxrow"><div class="fxline"><div class="fxname">MIX</div><div id="fxv5" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill5" class="fxfill"></div></div></div></div><div class="hint effectsHint">EFFECTS / READ ONLY</div></section>
-<section class="page debugPage"><div class="debugScroll" id="debugScroll">
-<div class="debugHead"><div class="debugTitle">SYNC LAB</div><div id="dbgBadge" class="debugBadge">WAIT</div></div>
-<div class="debugMetrics">
-<div class="debugMetric"><b>XHR TRY</b><span id="dbgTry">0</span></div>
-<div class="debugMetric"><b>HTTP OK</b><span id="dbgOk">0</span></div>
-<div class="debugMetric"><b>ERROR</b><span id="dbgErr">0</span></div>
-<div class="debugMetric"><b>RTT</b><span id="dbgRtt">-</span></div>
-<div class="debugMetric"><b>SERVER REQ</b><span id="dbgReq">-</span></div>
-<div class="debugMetric"><b>STATE SEQ</b><span id="dbgSeq">-</span></div>
-<div class="debugMetric"><b>UPTIME</b><span id="dbgUp">-</span></div>
-<div class="debugMetric"><b>HEAP</b><span id="dbgHeap">-</span></div>
-<div class="debugMetric"><b>MATCH</b><span id="dbgMatch" class="debugMatch">-</span></div>
-</div>
-<div class="debugActions"><button id="dbgNow" data-control="1" class="debugBtn">POLL NOW</button><button id="dbgPause" data-control="1" class="debugBtn">PAUSE</button></div>
-<div class="debugBlock"><div class="debugBlockTitle">DIRECT APPLIANCE</div><div class="debugGrid">
-<div class="k">POWER</div><div id="dbgOn" class="v">-</div>
-<div class="k">SOURCE</div><div id="dbgSource" class="v">-</div>
-<div class="k">INTENSITY</div><div id="dbgIntensity" class="v">-</div>
-<div class="k">MODE</div><div id="dbgMode" class="v">-</div>
-</div></div>
-<div class="debugBlock"><div class="debugBlockTitle">DIRECT EFFECTS</div><div class="debugFx">
-<div class="h">EFFECT</div><div class="h">STATE</div><div class="h">VALUE</div>
-<div class="n">PIXEL</div><div id="dbge0s" class="s">-</div><div id="dbge0v" class="lv">-</div>
-<div class="n">GLITCH</div><div id="dbge1s" class="s">-</div><div id="dbge1v" class="lv">-</div>
-<div class="n">POSTER</div><div id="dbge2s" class="s">-</div><div id="dbge2v" class="lv">-</div>
-<div class="n">HUE</div><div id="dbge3s" class="s">-</div><div id="dbge3v" class="lv">-</div>
-<div class="n">MIRROR</div><div id="dbge4s" class="s">-</div><div id="dbge4v" class="lv">-</div>
-<div class="n">MIX</div><div id="dbge5s" class="s">ON</div><div id="dbge5v" class="lv">-</div>
-</div></div>
-<div class="debugBlock"><div class="debugBlockTitle">LEGACY / MIRROR COPY</div><div id="dbgLegacy" class="debugLegacy">waiting...</div></div>
-<div class="debugBlock"><div class="debugBlockTitle">RAW JSON</div><pre id="dbgRaw" class="debugRaw">waiting...</pre></div>
-</div></section>
 </div></main>
-<div class="dots"><i id="d0" class="dot on"></i><i id="d1" class="dot"></i><i id="d2" class="dot"></i><i id="d3" class="dot"></i><i id="d4" class="dot"></i></div>
-<div class="hint bottomHint">SWIPE LEFT / RIGHT · PAGE 5 = TEMP SYNC LAB</div>
+<div class="dots"><i id="d0" class="dot on"></i><i id="d1" class="dot"></i><i id="d2" class="dot"></i><i id="d3" class="dot"></i></div>
+<div class="hint bottomHint">SWIPE LEFT / RIGHT · PAGE 2 LIVE SYNC</div>
 <script>
 var pg=0,sx=0,navBlocked=false;var v=document.getElementById('v'),t=document.getElementById('t');
-function page(n){pg=Math.max(0,Math.min(4,n));t.style.transform='translateX(-'+(pg*20)+'%)';for(var i=0;i<5;i++)document.getElementById('d'+i).className='dot'+(i===pg?' on':'');if(pg===4)scheduleDebug(0);}
+function page(n){pg=Math.max(0,Math.min(3,n));t.style.transform='translateX(-'+(pg*25)+'%)';for(var i=0;i<4;i++)document.getElementById('d'+i).className='dot'+(i===pg?' on':'');}
 v.addEventListener('touchstart',function(e){navBlocked=!!e.target.closest('[data-control]');if(!navBlocked)sx=e.touches[0].clientX},{passive:true});
 v.addEventListener('touchend',function(e){if(navBlocked){navBlocked=false;return}var dx=e.changedTouches[0].clientX-sx;if(dx<-45)page(pg+1);if(dx>45)page(pg-1)},{passive:true});
 
@@ -71,19 +39,5 @@ if(sourcePreview){sourcePreview.onerror=function(){sourcePreview.style.visibilit
 function drawPage2(s){var power=document.getElementById('power'),mode=document.getElementById('mode'),pct=document.getElementById('pct'),fill=document.getElementById('fill'),filename=document.getElementById('filename'),controls=document.getElementById('controls');var iv=clamp100(s.intensity);if(power){power.textContent=s.on?'ON':'OFF';power.className=s.on?'power':'power off'}if(mode)mode.textContent=s.mode?'BYPASS':'RANDOM';if(pct)pct.textContent=iv+'%';if(fill)fill.style.width=iv+'%';if(filename)filename.textContent=(s.filename||'F1_MOON.JPG').toUpperCase();if(controls)controls.className=s.on?'':'disabled';var photo=document.querySelector('.photo');if(photo)photo.classList.toggle('off',!s.on);setSource(s.filename)}
 function syncPage2(){clearTimeout(p2Timer);if(pg!==1){p2Timer=setTimeout(syncPage2,500);return}var x=new XMLHttpRequest();x.open('GET','/api/state?ts='+Date.now(),true);x.timeout=1500;x.onload=function(){if(x.status===200){try{var s=JSON.parse(x.responseText),j=JSON.stringify(s);if(j!==p2last){p2last=j;drawPage2(s)}}catch(e){}}p2Timer=setTimeout(syncPage2,300)};x.onerror=x.ontimeout=function(){p2Timer=setTimeout(syncPage2,600)};x.send(null)}
 syncPage2();
-
-/* M4.8 Sync Lab: independent serialized XHR loop. No fetch(), no shared Page 2 state. */
-var dbgTry=0,dbgOk=0,dbgErr=0,dbgPaused=false,dbgBusy=false,dbgTimer=0,dbgLastSuccess=0;
-function dt(id,val){var e=document.getElementById(id);if(e)e.textContent=String(val)}
-function dbgBadge(text,cls){var e=document.getElementById('dbgBadge');e.textContent=text;e.className='debugBadge'+(cls?' '+cls:'')}
-function formatUp(ms){ms=Number(ms)||0;var s=Math.floor(ms/1000),m=Math.floor(s/60),h=Math.floor(m/60);return h+'h '+(m%60)+'m '+(s%60)+'s'}
-function renderDebug(s,rtt){var d=s.direct||{},l=s.legacy||{},ef=d.effects||[],vals=d.values||[];dt('dbgReq',s.request_id);dt('dbgSeq',s.state_seq);dt('dbgUp',formatUp(s.uptime_ms));dt('dbgHeap',s.free_heap);dt('dbgRtt',rtt+'ms');var me=document.getElementById('dbgMatch');me.textContent=s.match?'YES':'NO';me.className='debugMatch '+(s.match?'yes':'no');dt('dbgOn',d.on?'ON':'OFF');dt('dbgSource',d.filename||'-');dt('dbgIntensity',d.intensity);dt('dbgMode',d.mode?'BYPASS':'RANDOM');for(var i=0;i<6;i++){dt('dbge'+i+'s',(i===5||ef[i])?'ON':'OFF');dt('dbge'+i+'v',i===4?'-':(vals[i]===undefined?'-':vals[i]))}var ls='POWER '+(l.on?'ON':'OFF')+'\nSOURCE '+(l.filename||'-')+'\nINTENSITY '+l.intensity+'\nMODE '+(l.mode?'BYPASS':'RANDOM')+'\nFX '+JSON.stringify(l.effects||[])+'\nVALUES '+JSON.stringify(l.values||[]);dt('dbgLegacy',ls);document.getElementById('dbgRaw').textContent=JSON.stringify(s,null,2);dbgLastSuccess=Date.now();dbgBadge('LIVE','live')}
-function debugDone(delay){dbgBusy=false;clearTimeout(dbgTimer);if(!dbgPaused&&pg===4)dbgTimer=setTimeout(debugPoll,delay)}
-function debugPoll(){if(dbgPaused||pg!==4||dbgBusy)return;dbgBusy=true;dbgTry++;dt('dbgTry',dbgTry);var start=Date.now(),done=false;var x=new XMLHttpRequest();x.open('GET','/api/debug/state?cb='+Date.now(),true);x.timeout=1800;try{x.setRequestHeader('Cache-Control','no-cache')}catch(e){}x.onload=function(){if(done)return;done=true;if(x.status===200){try{var s=JSON.parse(x.responseText);dbgOk++;dt('dbgOk',dbgOk);renderDebug(s,Date.now()-start);debugDone(500);return}catch(e){dbgErr++;dt('dbgErr',dbgErr);dbgBadge('JSON ERR','error')}}else{dbgErr++;dt('dbgErr',dbgErr);dbgBadge('HTTP '+x.status,'error')}debugDone(900)};x.onerror=function(){if(done)return;done=true;dbgErr++;dt('dbgErr',dbgErr);dbgBadge('NET ERR','error');debugDone(900)};x.ontimeout=function(){if(done)return;done=true;dbgErr++;dt('dbgErr',dbgErr);dbgBadge('TIMEOUT','error');debugDone(900)};x.send(null)}
-function scheduleDebug(delay){clearTimeout(dbgTimer);if(!dbgPaused&&pg===4)dbgTimer=setTimeout(debugPoll,delay)}
-document.getElementById('dbgNow').addEventListener('click',function(){dbgPaused=false;document.getElementById('dbgPause').textContent='PAUSE';dbgBadge('POLL...','');scheduleDebug(0)});
-document.getElementById('dbgPause').addEventListener('click',function(){dbgPaused=!dbgPaused;this.textContent=dbgPaused?'RESUME':'PAUSE';if(dbgPaused){clearTimeout(dbgTimer);dbgBadge('PAUSED','paused')}else{dbgBadge('POLL...','');scheduleDebug(0)}});
-setInterval(function(){if(pg===4&&!dbgPaused&&dbgLastSuccess&&Date.now()-dbgLastSuccess>2500)dbgBadge('STALE','error')},500);
-if(location.search.indexOf('page=5')>=0)page(4);
 </script>
 </body></html>
