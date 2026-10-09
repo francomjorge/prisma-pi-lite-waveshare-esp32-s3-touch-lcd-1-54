@@ -1,0 +1,5 @@
+PRISMA-PI LITE M4.11 CONTROLLER BASELINE
+
+Stable controller checkpoint.
+No administration functionality.
+Effect processing itself is outside this checkpoint; Page 4 state mirroring remains read-only.
