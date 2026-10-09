@@ -33,6 +33,19 @@ assert "isRealFs()||fsFrame.classList.contains('pseudoFull')" in index
 assert 'class="navLeft"' not in index
 assert 'class="navRight"' not in index
 
+# Live View desktop rotation: R rotates clockwise in 90-degree steps.
+assert "var previewRotation=0" in index
+assert "function rotatePreview()" in index
+assert "previewRotation=(previewRotation+90)%360" in index
+assert "e.key==='r'||e.key==='R'" in index
+assert "pg===2" in index
+assert "rotate('+previewRotation+'deg)" in index
+assert "fsFrame.clientHeight+'px'" in index
+assert "fsFrame.clientWidth+'px'" in index
+assert "requestAnimationFrame(applyPreviewRotation)" in index
+assert "window.addEventListener('resize',applyPreviewRotation)" in index
+assert "R ROTATE" in index
+
 assert '"web/index.html"' in cmake
 assert '"web/style.css"' in cmake
 assert '"web/app.js"' not in cmake
@@ -104,4 +117,4 @@ assert "esp_timer" not in cmake
 assert "hc.lru_purge_enable=true" in portal
 assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-print("v1.0 OK: stable controller + desktop arrow navigation + global sync + black OFF + clean fullscreen UI")
+print("v1.0 OK: stable controller + desktop arrows + R Live View rotation + global sync + black OFF + clean fullscreen UI")
