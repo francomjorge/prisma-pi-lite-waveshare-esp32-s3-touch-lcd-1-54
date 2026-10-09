@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <stdint.h>
 #include "wifi_portal.h"
+#include "admin_api.h"
 #include "esp_event.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
@@ -185,6 +186,7 @@ static void start_portal(void)
     httpd_config_t hc=HTTPD_DEFAULT_CONFIG();
     hc.uri_match_fn=httpd_uri_match_wildcard;
     hc.lru_purge_enable=true;
+    hc.max_uri_handlers=16;
     httpd_handle_t s=NULL;
     if(httpd_start(&s,&hc)==ESP_OK){
         httpd_uri_t a={.uri="/",.method=HTTP_GET,.handler=page_get};
@@ -195,8 +197,9 @@ static void start_portal(void)
         httpd_register_uri_handler(s,&b);
         httpd_register_uri_handler(s,&c);
         httpd_register_uri_handler(s,&d);
+        prisma_admin_register(s);
     }
-    ESP_LOGI(TAG,"PRISMA LITE M4.9 Global Web Sync: %s - http://192.168.4.1",ap);
+    ESP_LOGI(TAG,"PRISMA LITE v1.1 Admin RO: %s - http://192.168.4.1",ap);
 }
 
 void prisma_wifi_start(void)
