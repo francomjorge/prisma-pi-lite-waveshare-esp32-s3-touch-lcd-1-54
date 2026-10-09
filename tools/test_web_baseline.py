@@ -92,7 +92,7 @@ assert '"/source/*"' in portal
 assert "setSource(s.filename)" in index
 assert "photo.classList.toggle('off',!s.on)" in index
 
-# Page 5 FX Lab is browser-only. It reuses the already-loaded Live View image object.
+# Page 5 FX Lab is browser-only and reuses the already-loaded Live View image object.
 assert 'class="page labPage"' in index
 assert 'id="labCanvas"' in index
 assert 'id="labPipeline"' in index
@@ -109,12 +109,36 @@ assert "draggable=true" in index
 assert "prismaFxLabOrderV0" in index
 assert "BROWSER GRAPHICS PIPELINE" in index
 assert "ORDER = PROCESSING ORDER" in index
-assert "LAB ORDER IS BROWSER ONLY" in index
+assert "MIX IS GLOBAL / FIXED LAST" in index
 assert "new Image(" not in index
 assert "fetch('/source/" not in index
 assert "XMLHttpRequest" in index
 assert "api/debug/state" not in index
 assert '"/api/debug/state"' not in portal
+
+# FX ENGINE V0 is infrastructure only: native browser canvases, no active processors yet.
+assert "FX ENGINE V0" in index
+assert "fxBufferA=document.createElement('canvas')" in index
+assert "fxBufferB=document.createElement('canvas')" in index
+assert "fxScratch=document.createElement('canvas')" in index
+assert "version:'0'" in index
+assert "0:{id:'pixel',process:null}" in index
+assert "1:{id:'glitch',process:null}" in index
+assert "2:{id:'poster',process:null}" in index
+assert "3:{id:'hue',process:null}" in index
+assert "4:{id:'mirror',process:null}" in index
+assert "fxEngine.resize(w,h)" in index
+assert "mixGain:function(v){return clamp100(v)/50}" in index
+
+# MIX is global metadata, normalized to the final slot, never draggable/reorderable.
+assert "function normalizeLabOrder(order)" in index
+assert "out.push(5)" in index
+assert "if(fx===5)return" in index
+assert "slice(0,-1).reverse()" in index
+assert "function appendLabMixBlock(s)" in index
+assert "block.draggable=false" in index
+assert "block.dataset.fx='5'" in index
+assert "appendLabMixBlock(s)" in index
 
 assert ".photo.off{background:#000!important}" in style
 assert ".photo.off #offscreen{display:none!important}" in style
@@ -138,4 +162,4 @@ assert "esp_timer" in cmake
 assert "hc.lru_purge_enable=true" in portal
 assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-print("V0 controller protected + page 5 FX Lab OK: shared image object + active reorderable browser-only pipeline")
+print("V0 protected + FX Engine V0 infrastructure OK: native A/B/scratch buffers + fixed global MIX")
