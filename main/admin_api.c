@@ -20,6 +20,7 @@
 #define ADMIN_MAX_SOURCES 32
 #define ADMIN_MAX_FILE_BYTES (512U * 1024U)
 #define ADMIN_STORAGE_RESERVE (256U * 1024U)
+#define ADMIN_CACHE_FILES 64
 
 extern const uint8_t web_admin_html_start[] asm("_binary_admin_html_start");
 extern const uint8_t web_admin_html_end[] asm("_binary_admin_html_end");
@@ -27,6 +28,22 @@ extern const uint8_t web_admin_css_start[] asm("_binary_admin_css_start");
 extern const uint8_t web_admin_css_end[] asm("_binary_admin_css_end");
 extern const uint8_t web_admin_js_start[] asm("_binary_admin_js_start");
 extern const uint8_t web_admin_js_end[] asm("_binary_admin_js_end");
+
+typedef struct {
+    char name[64];
+    uint32_t size;
+    bool source;
+} admin_cached_file_t;
+
+static bool storage_snapshot_done;
+static bool storage_snapshot_ok;
+static size_t storage_total_cached;
+static size_t storage_used_cached;
+static size_t storage_free_cached;
+static size_t storage_safe_cached;
+static int storage_source_count_cached;
+static int storage_file_count_cached;
+static admin_cached_file_t storage_files_cached[ADMIN_CACHE_FILES];
 
 static void no_cache(httpd_req_t *r)
 {
@@ -81,6 +98,70 @@ static void get_ap_ip(char *ipbuf, size_t size)
     }
 }
 
+static bool is_jpeg(const char *name)
+{
+    const char *dot = strrchr(name, '.');
+    return dot && (!strcasecmp(dot, ".jpg") || !strcasecmp(dot, ".jpeg"));
+}
+
+static void safe_json_name(char *dst, size_t dst_size, const char *src)
+{
+    size_t j = 0;
+    for (size_t i = 0; src && src[i] && j + 1 < dst_size; i++) {
+        unsigned char c = (unsigned char)src[i];
+        dst[j++] = (c == '"' || c == '\\' || c < 32) ? '_' : (char)c;
+    }
+    dst[j] = 0;
+}
+
+/*
+ * Storage snapshot policy:
+ * - calculated exactly once per boot
+ * - never rescans SPIFFS during the lifetime of the boot
+ * - future write operations must explicitly invalidate/rebuild this snapshot
+ */
+static void admin_storage_snapshot_init(void)
+{
+    if (storage_snapshot_done) return;
+    storage_snapshot_done = true;
+
+    size_t total = 0, used = 0;
+    if (esp_spiffs_info("storage", &total, &used) != ESP_OK) {
+        storage_snapshot_ok = false;
+        return;
+    }
+
+    storage_total_cached = total;
+    storage_used_cached = used;
+    storage_free_cached = total > used ? total - used : 0;
+    storage_safe_cached = storage_free_cached > ADMIN_STORAGE_RESERVE
+        ? storage_free_cached - ADMIN_STORAGE_RESERVE : 0;
+    if (storage_safe_cached > ADMIN_MAX_FILE_BYTES)
+        storage_safe_cached = ADMIN_MAX_FILE_BYTES;
+
+    DIR *dir = opendir("/storage");
+    if (dir) {
+        struct dirent *entry;
+        while ((entry = readdir(dir)) != NULL && storage_file_count_cached < ADMIN_CACHE_FILES) {
+            if (!entry->d_name[0]) continue;
+            char path[96];
+            int plen = snprintf(path, sizeof(path), "/storage/%s", entry->d_name);
+            if (plen <= 0 || plen >= (int)sizeof(path)) continue;
+            struct stat st;
+            if (stat(path, &st) != 0) continue;
+
+            admin_cached_file_t *f = &storage_files_cached[storage_file_count_cached++];
+            strlcpy(f->name, entry->d_name, sizeof(f->name));
+            f->size = (uint32_t)st.st_size;
+            f->source = is_jpeg(entry->d_name);
+            if (f->source) storage_source_count_cached++;
+        }
+        closedir(dir);
+    }
+
+    storage_snapshot_ok = true;
+}
+
 static esp_err_t admin_overview_get(httpd_req_t *r)
 {
     int batt_mv = 0, batt_pct = 0;
@@ -112,60 +193,10 @@ static esp_err_t admin_overview_get(httpd_req_t *r)
     return send_json(r, b, n);
 }
 
-/* One compact endpoint for the Overview. It deliberately does not depend on the browser
- * successfully chaining four separate requests before showing useful information. */
+/* Compatibility endpoint. It is intentionally light and never touches Wi-Fi or SPIFFS. */
 static esp_err_t admin_status_get(httpd_req_t *r)
 {
-    const esp_app_desc_t *app = esp_app_get_description();
-    uint64_t uptime_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
-
-    int batt_mv = 0, batt_pct = 0;
-    bool battery = prisma_metrics_battery(&batt_mv, &batt_pct);
-    bool charging = false;
-    bool charging_known = prisma_metrics_charging(&charging);
-    float chip_temp = 0.0f;
-    bool temp_ok = prisma_metrics_chip_temperature(&chip_temp);
-
-    size_t storage_total = 0, storage_used = 0;
-    bool storage_ok = esp_spiffs_info("storage", &storage_total, &storage_used) == ESP_OK;
-    size_t storage_free = storage_total > storage_used ? storage_total - storage_used : 0;
-
-    wifi_config_t cfg = {0};
-    bool wifi_ok = esp_wifi_get_config(WIFI_IF_AP, &cfg) == ESP_OK;
-    uint8_t channel = 0;
-    wifi_second_chan_t second = WIFI_SECOND_CHAN_NONE;
-    if (wifi_ok) esp_wifi_get_channel(&channel, &second);
-    wifi_sta_list_t stations = {0};
-    if (wifi_ok) esp_wifi_ap_get_sta_list(&stations);
-    char ipbuf[20];
-    get_ap_ip(ipbuf, sizeof(ipbuf));
-
-    char b[1792];
-    int n = snprintf(b, sizeof(b),
-        "{\"ok\":true,\"version\":\"PRISMA-PI LITE v1.1 ADMIN RO\","
-        "\"idf\":\"%s\",\"build_date\":\"%s\",\"build_time\":\"%s\","
-        "\"uptime_ms\":%llu,\"heap_free\":%u,\"heap_min\":%u,\"reset_reason\":\"%s\","
-        "\"flash_bytes\":%u,\"psram_bytes\":%u,"
-        "\"temperature\":{\"present\":%s,\"c\":%.1f},"
-        "\"battery\":{\"present\":%s,\"mv\":%d,\"percent\":%d,\"charging_known\":%s,\"charging\":%s},"
-        "\"wifi\":{\"ok\":%s,\"ssid\":\"%s\",\"ip\":\"%s\",\"channel\":%u,\"clients\":%u,\"max_clients\":%u},"
-        "\"storage\":{\"ok\":%s,\"total\":%u,\"used\":%u,\"free\":%u,\"sources\":%d},"
-        "\"imu\":{\"present\":%s}}",
-        esp_get_idf_version(), app ? app->date : "", app ? app->time : "",
-        (unsigned long long)uptime_ms, (unsigned)esp_get_free_heap_size(),
-        (unsigned)esp_get_minimum_free_heap_size(), reset_reason_name(esp_reset_reason()),
-        (unsigned)prisma_metrics_flash_size(), (unsigned)prisma_metrics_psram_size(),
-        temp_ok ? "true" : "false", temp_ok ? chip_temp : 0.0f,
-        battery ? "true" : "false", battery ? batt_mv : 0, battery ? batt_pct : 0,
-        charging_known ? "true" : "false", charging_known && charging ? "true" : "false",
-        wifi_ok ? "true" : "false", wifi_ok ? (char *)cfg.ap.ssid : "", ipbuf, (unsigned)channel,
-        wifi_ok ? (unsigned)stations.num : 0, wifi_ok ? (unsigned)cfg.ap.max_connection : 0,
-        storage_ok ? "true" : "false", (unsigned)storage_total, (unsigned)storage_used,
-        (unsigned)storage_free, prisma_storage_count(),
-        prisma_sensors_imu_ready() ? "true" : "false");
-    if (n < 0 || n >= (int)sizeof(b))
-        return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "status overflow");
-    return send_json(r, b, n);
+    return admin_overview_get(r);
 }
 
 static esp_err_t admin_sensors_get(httpd_req_t *r)
@@ -187,83 +218,45 @@ static esp_err_t admin_sensors_get(httpd_req_t *r)
     return send_json(r, b, n);
 }
 
-static bool is_jpeg(const char *name)
-{
-    const char *dot = strrchr(name, '.');
-    return dot && (!strcasecmp(dot, ".jpg") || !strcasecmp(dot, ".jpeg"));
-}
-
-static void safe_json_name(char *dst, size_t dst_size, const char *src)
-{
-    size_t j = 0;
-    for (size_t i = 0; src && src[i] && j + 1 < dst_size; i++) {
-        unsigned char c = (unsigned char)src[i];
-        dst[j++] = (c == '"' || c == '\\' || c < 32) ? '_' : (char)c;
-    }
-    dst[j] = 0;
-}
-
-static esp_err_t finish_chunks(httpd_req_t *r)
-{
-    if (httpd_resp_send_chunk(r, "]}", 2) != ESP_OK) return ESP_FAIL;
-    return httpd_resp_send_chunk(r, NULL, 0);
-}
-
 static esp_err_t admin_storage_get(httpd_req_t *r)
 {
-    size_t total = 0, used = 0;
-    if (esp_spiffs_info("storage", &total, &used) != ESP_OK)
-        return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "storage unavailable");
-
-    size_t free_b = total > used ? total - used : 0;
-    size_t safe = free_b > ADMIN_STORAGE_RESERVE ? free_b - ADMIN_STORAGE_RESERVE : 0;
-    if (safe > ADMIN_MAX_FILE_BYTES) safe = ADMIN_MAX_FILE_BYTES;
+    admin_storage_snapshot_init();
+    if (!storage_snapshot_ok)
+        return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "storage snapshot unavailable");
 
     httpd_resp_set_type(r, "application/json");
     no_cache(r);
     char head[384];
     int n = snprintf(head, sizeof(head),
-        "{\"total\":%u,\"used\":%u,\"free\":%u,\"source_count\":%d,"
-        "\"max_sources\":%d,\"max_file_bytes\":%u,\"reserve_bytes\":%u,"
+        "{\"snapshot\":\"boot\",\"total\":%u,\"used\":%u,\"free\":%u,\"source_count\":%d,"
+        "\"file_count\":%d,\"max_sources\":%d,\"max_file_bytes\":%u,\"reserve_bytes\":%u,"
         "\"safe_upload_now\":%u,\"files\":[",
-        (unsigned)total, (unsigned)used, (unsigned)free_b, prisma_storage_count(),
-        ADMIN_MAX_SOURCES, (unsigned)ADMIN_MAX_FILE_BYTES,
-        (unsigned)ADMIN_STORAGE_RESERVE, (unsigned)safe);
+        (unsigned)storage_total_cached, (unsigned)storage_used_cached,
+        (unsigned)storage_free_cached, storage_source_count_cached,
+        storage_file_count_cached, ADMIN_MAX_SOURCES, (unsigned)ADMIN_MAX_FILE_BYTES,
+        (unsigned)ADMIN_STORAGE_RESERVE, (unsigned)storage_safe_cached);
     if (n < 0 || n >= (int)sizeof(head) || httpd_resp_send_chunk(r, head, n) != ESP_OK)
         return ESP_FAIL;
 
-    DIR *dir = opendir("/storage");
-    bool first = true;
-    if (dir) {
-        struct dirent *entry;
-        const char *current = prisma_storage_current();
-        while ((entry = readdir(dir)) != NULL) {
-            if (!entry->d_name[0]) continue;
-            char path[96], clean[64];
-            int plen = snprintf(path, sizeof(path), "/storage/%s", entry->d_name);
-            if (plen <= 0 || plen >= (int)sizeof(path)) continue;
-            struct stat st;
-            if (stat(path, &st) != 0) continue;
-            safe_json_name(clean, sizeof(clean), entry->d_name);
-            char item[256];
-            int m = snprintf(item, sizeof(item),
-                "%s{\"name\":\"%s\",\"size\":%u,\"source\":%s,\"active\":%s}",
-                first ? "" : ",", clean, (unsigned)st.st_size,
-                is_jpeg(entry->d_name) ? "true" : "false",
-                current && !strcasecmp(current, entry->d_name) ? "true" : "false");
-            if (m > 0 && m < (int)sizeof(item)) {
-                if (httpd_resp_send_chunk(r, item, m) != ESP_OK) {
-                    closedir(dir);
-                    return ESP_FAIL;
-                }
-                first = false;
-            }
-        }
-        closedir(dir);
+    const char *current = prisma_storage_current();
+    for (int i = 0; i < storage_file_count_cached; i++) {
+        admin_cached_file_t *f = &storage_files_cached[i];
+        char clean[64], item[256];
+        safe_json_name(clean, sizeof(clean), f->name);
+        int m = snprintf(item, sizeof(item),
+            "%s{\"name\":\"%s\",\"size\":%u,\"source\":%s,\"active\":%s}",
+            i ? "," : "", clean, (unsigned)f->size,
+            f->source ? "true" : "false",
+            current && !strcasecmp(current, f->name) ? "true" : "false");
+        if (m <= 0 || m >= (int)sizeof(item) || httpd_resp_send_chunk(r, item, m) != ESP_OK)
+            return ESP_FAIL;
     }
-    return finish_chunks(r);
+
+    if (httpd_resp_send_chunk(r, "]}", 2) != ESP_OK) return ESP_FAIL;
+    return httpd_resp_send_chunk(r, NULL, 0);
 }
 
+/* Wi-Fi is intentionally calculated only when this endpoint is requested. */
 static esp_err_t admin_network_get(httpd_req_t *r)
 {
     wifi_config_t cfg = {0};
@@ -301,12 +294,17 @@ static esp_err_t admin_network_get(httpd_req_t *r)
         if (m > 0 && m < (int)sizeof(item) && httpd_resp_send_chunk(r, item, m) != ESP_OK)
             return ESP_FAIL;
     }
-    return finish_chunks(r);
+    if (httpd_resp_send_chunk(r, "]}", 2) != ESP_OK) return ESP_FAIL;
+    return httpd_resp_send_chunk(r, NULL, 0);
 }
 
 void prisma_admin_register(httpd_handle_t server)
 {
     if (!server) return;
+
+    /* One storage calculation per boot. No periodic filesystem polling. */
+    admin_storage_snapshot_init();
+
     httpd_uri_t page = {.uri="/admin",.method=HTTP_GET,.handler=admin_page_get};
     httpd_uri_t css = {.uri="/admin.css",.method=HTTP_GET,.handler=admin_css_get};
     httpd_uri_t js = {.uri="/admin.js",.method=HTTP_GET,.handler=admin_js_get};
