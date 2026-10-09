@@ -62,7 +62,7 @@ assert 'admin_storage_snapshot_init();' in api
 assert api.count('esp_spiffs_info("storage"') == 1
 assert api.count('opendir("/storage")') == 1
 assert 'storage_files_cached' in api
-assert '\"snapshot\":\"boot\"' in api
+assert r'\"snapshot\":\"boot\"' in api
 assert 'file_count' in api
 
 # Wi-Fi is only read inside the explicit network endpoint.
