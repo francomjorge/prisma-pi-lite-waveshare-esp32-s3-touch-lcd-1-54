@@ -1,4 +1,5 @@
 #include "prisma_touch.h"
+#include "prisma_sensors.h"
 #include "driver/i2c_master.h"
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
@@ -24,6 +25,8 @@ bool prisma_touch_init(void){
  vTaskDelay(pdMS_TO_TICKS(80));
  i2c_master_bus_config_t bc={.i2c_port=I2C_NUM_0,.sda_io_num=TP_SDA,.scl_io_num=TP_SCL,.clk_source=I2C_CLK_SRC_DEFAULT,.glitch_ignore_cnt=7,.flags.enable_internal_pullup=true};
  if(i2c_new_master_bus(&bc,&bus)!=ESP_OK){ESP_LOGE(TAG,"I2C bus failed");return false;}
+ /* Waveshare factory uses this same bus for QMI8658 and CST816S. */
+ prisma_sensors_init(bus);
  i2c_device_config_t dc={.dev_addr_length=I2C_ADDR_BIT_LEN_7,.device_address=TP_ADDR,.scl_speed_hz=400000};
  if(i2c_master_bus_add_device(bus,&dc,&dev)!=ESP_OK){ESP_LOGE(TAG,"CST816 add failed");return false;}
  uint8_t reg=0xA7,id=0;
