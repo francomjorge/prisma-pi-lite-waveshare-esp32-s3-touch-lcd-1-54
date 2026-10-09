@@ -18,12 +18,12 @@
 #undef mode_index
 #undef synth_on
 
-static const char *SYNC_TAG = "SYNC_LAB";
+static const char *SYNC_TAG = "WEB_SYNC";
 
 /*
  * Authoritative appliance getters.
  * These read the exact variables used by the LCD/touch UI in main.c.
- * The temporary web Sync Lab calls them on every HTTP request.
+ * The web state endpoint reads them directly on every request.
  */
 bool prisma_appliance_get_on(void)
 {
@@ -64,6 +64,6 @@ void app_main(void)
     prisma_shared_intensity = 61;
     prisma_storage_init();
 
-    ESP_LOGI(SYNC_TAG, "M4.8 SYNC LAB ACTIVE - DIRECT APPLIANCE GETTERS");
+    ESP_LOGI(SYNC_TAG, "M4.9 GLOBAL WEB SYNC ACTIVE - DIRECT APPLIANCE GETTERS");
     prisma_legacy_main();
 }
