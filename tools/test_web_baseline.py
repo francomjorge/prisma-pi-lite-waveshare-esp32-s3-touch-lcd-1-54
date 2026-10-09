@@ -92,14 +92,13 @@ assert '"/source/*"' in portal
 assert "setSource(s.filename)" in index
 assert "photo.classList.toggle('off',!s.on)" in index
 
-# Page 5 FX Lab is browser-only and reuses the already-loaded Live View image object.
+# Page 5 FX Lab remains browser-only and reuses the already-loaded Live View image object.
 assert 'class="page labPage"' in index
 assert 'id="labCanvas"' in index
 assert 'id="labPipeline"' in index
 assert 'id="labReverse"' in index
 assert 'id="d4"' in index
 assert "function renderLabPreview()" in index
-assert "ctx.drawImage(sourcePreview,0,0,w,h)" in index
 assert "function renderLabPipeline(s)" in index
 assert "labFxNames=['PIXEL','GLITCH','POSTER','HUE','MIRROR','MIX']" in index
 assert "labFxOrder=[0,1,2,3,4,5]" in index
@@ -116,19 +115,28 @@ assert "XMLHttpRequest" in index
 assert "api/debug/state" not in index
 assert '"/api/debug/state"' not in portal
 
-# FX ENGINE V0 is infrastructure only: native browser canvases, no active processors yet.
-assert "FX ENGINE V0" in index
+# FX ENGINE V1: native A/B/scratch pipeline with PIXEL as the only active processor.
+assert "FX ENGINE V1" in index
 assert "fxBufferA=document.createElement('canvas')" in index
 assert "fxBufferB=document.createElement('canvas')" in index
 assert "fxScratch=document.createElement('canvas')" in index
-assert "version:'0'" in index
-assert "0:{id:'pixel',process:null}" in index
+assert "version:'1'" in index
+assert "0:{id:'pixel',process:processPixelFx}" in index
 assert "1:{id:'glitch',process:null}" in index
 assert "2:{id:'poster',process:null}" in index
 assert "3:{id:'hue',process:null}" in index
 assert "4:{id:'mirror',process:null}" in index
 assert "fxEngine.resize(w,h)" in index
 assert "mixGain:function(v){return clamp100(v)/50}" in index
+assert "function pixelBlockSize(v)" in index
+assert "Math.pow(n/100,2)*63" in index
+assert "function processPixelFx(src,dst,value,context)" in index
+assert "effective=clamp100(value*context.mixGain)" in index
+assert "imageSmoothingEnabled=false" in index
+assert "function renderRotatedSource(" in index
+assert "function runFxPipeline(s)" in index
+assert "node.process(src,dst,labEffectValue(s,fx)" in index
+assert "var output=runFxPipeline(latestState)" in index
 
 # MIX is global metadata, normalized to the final slot, never draggable/reorderable.
 assert "function normalizeLabOrder(order)" in index
@@ -162,4 +170,4 @@ assert "esp_timer" in cmake
 assert "hc.lru_purge_enable=true" in portal
 assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-print("V0 protected + FX Engine V0 infrastructure OK: native A/B/scratch buffers + fixed global MIX")
+print("V0 protected + FX Engine V1 PIXEL OK: browser-native pixelation + fixed global MIX sensitivity")
