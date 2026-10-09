@@ -3,13 +3,15 @@
 
 void prisma_wifi_start(void);
 
-/* Direct authoritative state exported by app36.c for /api/state. */
+/* Direct authoritative state exported by app36.c. */
 bool prisma_appliance_get_on(void);
 int prisma_appliance_get_mode(void);
 int prisma_appliance_get_intensity(void);
 const char *prisma_appliance_get_filename(void);
+bool prisma_appliance_get_effect(int effect);
+int prisma_appliance_get_effect_value(int effect);
 
-/* Legacy/shared setters retained for current appliance effect/source code. */
+/* Legacy/shared state kept only for comparison during Sync Lab diagnostics. */
 bool prisma_control_get_on(void);
 int prisma_control_get_mode(void);
 int prisma_control_get_intensity(void);
