@@ -1,0 +1,2 @@
+The exact hardware-tested RC1 firmware source head was fc5a0aa20f455128214812d9938f0df84ae4576b.
+This note does not alter compiled firmware behavior.
