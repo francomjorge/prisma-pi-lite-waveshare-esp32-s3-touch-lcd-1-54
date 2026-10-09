@@ -2,6 +2,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "storage.h"
+#include "power_button.h"
 
 #define synth_on prisma_shared_on
 #define mode_index prisma_shared_mode
@@ -60,10 +61,17 @@ int prisma_appliance_get_effect_value(int effect)
 
 void app_main(void)
 {
+    /*
+     * Preserve the v5.0 boot path when the power key is not held.
+     * A boot initiated from OFF requires a continuous 3-second GPIO5 hold.
+     */
+    prisma_power_prepare_boot();
+
     prisma_shared_mode = 0;
     prisma_shared_intensity = 61;
     prisma_storage_init();
+    prisma_power_start_monitor();
 
-    ESP_LOGI(SYNC_TAG, "M4.9 GLOBAL WEB SYNC ACTIVE - DIRECT APPLIANCE GETTERS");
+    ESP_LOGI(SYNC_TAG, "PRISMA-PI LITE v1.0 STABLE - GLOBAL SYNC + POWER CONTROL");
     prisma_legacy_main();
 }
