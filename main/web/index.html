@@ -15,12 +15,13 @@
 <section class="page"><div id="controls"><div class="card"><div class="row"><div id="sourceSelect" class="sourceSelect" data-control="1"><div class="label">NOW PLAYING</div><div id="filename" class="value">F1_MOON.JPG</div></div><div id="power" class="power" data-control="1">ON</div></div></div><div class="card"><div class="row compact"><div class="label stronglabel">INTENSITY</div><div id="pct" class="intensityValue">61%</div></div><div id="intensityBar" class="bar" data-control="1"><div id="fill" class="fill"></div></div></div><div class="card modecard"><div class="label stronglabel">MODE</div><div id="mode" class="mode" data-control="1">RANDOM</div></div></div></section>
 <section class="page"><div id="photoFrame" class="photo"><img id="sourcePreview" class="sourcePreview" alt="PRISMA source preview"><div id="offscreen">SYNTH OFF</div><button id="fsBtn" class="fsBtn" type="button">FULL SCREEN</button></div><div class="hint photoHint">VISUAL MONITOR / READ ONLY</div></section>
 <section class="page"><div id="effects" class="effects"><div id="fx0" class="fxrow off"><div class="fxline"><div class="fxname">PIXEL</div><div id="fxv0" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill0" class="fxfill"></div></div></div><div id="fx1" class="fxrow off"><div class="fxline"><div class="fxname">GLITCH</div><div id="fxv1" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill1" class="fxfill"></div></div></div><div id="fx2" class="fxrow off"><div class="fxline"><div class="fxname">POSTER</div><div id="fxv2" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill2" class="fxfill"></div></div></div><div id="fx3" class="fxrow off"><div class="fxline"><div class="fxname">HUE</div><div id="fxv3" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill3" class="fxfill"></div></div></div><div id="fx4" class="fxrow off mirrorRow"><div class="fxline"><div class="fxname">MIRROR</div><div id="fxmirror" class="fxswitch off">OFF</div></div></div><div id="fx5" class="fxrow"><div class="fxline"><div class="fxname">MIX</div><div id="fxv5" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill5" class="fxfill"></div></div></div></div><div class="hint effectsHint">EFFECTS / READ ONLY</div></section>
+<section class="page"><div class="labHead"><div><div class="label">PAGE 5</div><div class="labTitle">FX LAB / TEST LIVE VIEW</div></div><div class="labBadge">JS ENGINE</div></div><div id="labFrame" class="photo labPhoto"><canvas id="labCanvas"></canvas></div><div class="labStatus"><span>PIXEL</span><b id="labPixelState">OFF · 50</b></div><div class="hint labHint">ISOLATED GRAPHICS ENGINE · SAME LIVE VIEW SOURCE</div></section>
 </div></main>
-<div class="dots"><i id="d0" class="dot on"></i><i id="d1" class="dot"></i><i id="d2" class="dot"></i><i id="d3" class="dot"></i></div>
+<div class="dots"><i id="d0" class="dot on"></i><i id="d1" class="dot"></i><i id="d2" class="dot"></i><i id="d3" class="dot"></i><i id="d4" class="dot"></i></div>
 <div class="hint bottomHint">SWIPE LEFT / RIGHT · GLOBAL LIVE SYNC</div>
 <script>
 var pg=0,sx=0,navBlocked=false;var v=document.getElementById('v'),t=document.getElementById('t');
-function page(n){pg=Math.max(0,Math.min(3,n));t.style.transform='translateX(-'+(pg*25)+'%)';for(var i=0;i<4;i++)document.getElementById('d'+i).className='dot'+(i===pg?' on':'');}
+function page(n){pg=Math.max(0,Math.min(4,n));t.style.transform='translateX(-'+(pg*20)+'%)';for(var i=0;i<5;i++)document.getElementById('d'+i).className='dot'+(i===pg?' on':'');}
 v.addEventListener('touchstart',function(e){navBlocked=!!e.target.closest('[data-control]');if(!navBlocked)sx=e.touches[0].clientX},{passive:true});
 v.addEventListener('touchend',function(e){if(navBlocked){navBlocked=false;return}var dx=e.changedTouches[0].clientX-sx;if(dx<-45)page(pg+1);if(dx>45)page(pg-1)},{passive:true});
 
@@ -35,13 +36,31 @@ var stateLast='',currentSource='',syncTimer=0,syncBusy=false;var sourcePreview=d
 function clamp100(v){v=Number(v);if(!isFinite(v))return 0;return Math.max(0,Math.min(100,Math.round(v)))}
 function cleanSourceName(name){return (name||'F1_MOON.JPG').replace(/[^A-Za-z0-9._-]/g,'')}
 function setSource(name){if(!sourcePreview)return;var f=cleanSourceName(name);if(!f||f===currentSource)return;currentSource=f;sourcePreview.style.visibility='visible';sourcePreview.src='/source/'+encodeURIComponent(f)+'?v='+Date.now()}
-if(sourcePreview){sourcePreview.onerror=function(){sourcePreview.style.visibility='hidden'};sourcePreview.onload=function(){sourcePreview.style.visibility='visible'}}
+
+/* PAGE 5 FX LAB: isolated JavaScript graphics engine. It never replaces the normal Live View. */
+var labCanvas=document.getElementById('labCanvas'),labCtx=labCanvas?labCanvas.getContext('2d'):null,labBuffer=document.createElement('canvas'),labBufferCtx=labBuffer.getContext('2d');
+var labState={on:true,pixelEnabled:false,pixelValue:50};
+function pixelBlockSize(value){var n=clamp100(value)/100;return 1+Math.round(n*n*47)}
+function renderFxLab(){
+  if(!labCanvas||!labCtx||!sourcePreview||!sourcePreview.complete||!sourcePreview.naturalWidth)return;
+  var sw=sourcePreview.naturalWidth,sh=sourcePreview.naturalHeight,maxW=960,scale=Math.min(1,maxW/sw),w=Math.max(1,Math.round(sw*scale)),h=Math.max(1,Math.round(sh*scale));
+  if(labCanvas.width!==w)labCanvas.width=w;if(labCanvas.height!==h)labCanvas.height=h;
+  labCtx.fillStyle='#000';labCtx.fillRect(0,0,w,h);
+  if(!labState.on)return;
+  if(!labState.pixelEnabled){labCtx.imageSmoothingEnabled=true;labCtx.drawImage(sourcePreview,0,0,w,h);return;}
+  var block=pixelBlockSize(labState.pixelValue),rw=Math.max(1,Math.round(w/block)),rh=Math.max(1,Math.round(h/block));
+  labBuffer.width=rw;labBuffer.height=rh;labBufferCtx.imageSmoothingEnabled=true;labBufferCtx.clearRect(0,0,rw,rh);labBufferCtx.drawImage(sourcePreview,0,0,rw,rh);
+  labCtx.imageSmoothingEnabled=false;labCtx.clearRect(0,0,w,h);labCtx.drawImage(labBuffer,0,0,rw,rh,0,0,w,h);
+}
+function drawPage5(s){var ef=Array.isArray(s.effects)?s.effects:[],vals=Array.isArray(s.values)?s.values:[];labState.on=!!s.on;labState.pixelEnabled=!!ef[0];labState.pixelValue=clamp100(vals[0]);var status=document.getElementById('labPixelState');if(status)status.textContent=(labState.pixelEnabled?'ON':'OFF')+' · '+labState.pixelValue;renderFxLab()}
+
+if(sourcePreview){sourcePreview.onerror=function(){sourcePreview.style.visibility='hidden';if(labCtx&&labCanvas)labCtx.clearRect(0,0,labCanvas.width,labCanvas.height)};sourcePreview.onload=function(){sourcePreview.style.visibility='visible';renderFxLab()}}
 
 function drawPage2(s){var power=document.getElementById('power'),mode=document.getElementById('mode'),pct=document.getElementById('pct'),fill=document.getElementById('fill'),filename=document.getElementById('filename'),controls=document.getElementById('controls');var iv=clamp100(s.intensity);if(power){power.textContent=s.on?'ON':'OFF';power.className=s.on?'power':'power off'}if(mode)mode.textContent=s.mode?'BYPASS':'RANDOM';if(pct)pct.textContent=iv+'%';if(fill)fill.style.width=iv+'%';if(filename)filename.textContent=(s.filename||'F1_MOON.JPG').toUpperCase();if(controls)controls.className=s.on?'':'disabled';var photo=document.querySelector('.photo');if(photo)photo.classList.toggle('off',!s.on);setSource(s.filename)}
 
 function drawPage4(s){var ef=Array.isArray(s.effects)?s.effects:[],vals=Array.isArray(s.values)?s.values:[];for(var i=0;i<6;i++){var enabled=(i===5)?true:!!ef[i];var row=document.getElementById('fx'+i);if(row)row.className='fxrow'+(enabled?'':' off')+(i===4?' mirrorRow':'');if(i===4){var sw=document.getElementById('fxmirror');if(sw){sw.textContent=enabled?'ON':'OFF';sw.className=enabled?'fxswitch':'fxswitch off'}}else{var vv=clamp100(vals[i]);var value=document.getElementById('fxv'+i),fill=document.getElementById('fxfill'+i);if(value)value.textContent=vv;if(fill)fill.style.width=vv+'%'}}}
 
-function drawAll(s){drawPage2(s);drawPage4(s)}
+function drawAll(s){drawPage2(s);drawPage4(s);drawPage5(s)}
 function scheduleSync(delay){clearTimeout(syncTimer);syncTimer=setTimeout(syncAll,delay)}
 function syncAll(){if(syncBusy){scheduleSync(100);return}syncBusy=true;var x=new XMLHttpRequest();x.open('GET','/api/state?ts='+Date.now(),true);x.timeout=1500;x.onload=function(){syncBusy=false;if(x.status===200){try{var s=JSON.parse(x.responseText),j=JSON.stringify(s);if(j!==stateLast){stateLast=j;drawAll(s)}scheduleSync(300);return}catch(e){}}scheduleSync(600)};x.onerror=x.ontimeout=function(){syncBusy=false;scheduleSync(600)};x.send(null)}
 syncAll();
