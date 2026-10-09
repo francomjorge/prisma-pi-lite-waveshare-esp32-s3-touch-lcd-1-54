@@ -8,6 +8,7 @@
 
 #include "esp_app_desc.h"
 #include "esp_netif.h"
+#include "esp_netif_ip_addr.h"
 #include "esp_spiffs.h"
 #include "esp_system.h"
 #include "esp_timer.h"
@@ -67,8 +68,6 @@ static esp_err_t admin_overview_get(httpd_req_t *r)
     bool battery = prisma_metrics_battery(&batt_mv, &batt_pct);
     const esp_app_desc_t *app = esp_app_get_description();
     uint64_t uptime_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
-    uint32_t heap_free = esp_get_free_heap_size();
-    uint32_t heap_min = esp_get_minimum_free_heap_size();
     char b[768];
     int n = snprintf(b, sizeof(b),
         "{\"version\":\"PRISMA-PI LITE v1.1 ADMIN RO\","
@@ -77,11 +76,13 @@ static esp_err_t admin_overview_get(httpd_req_t *r)
         "\"reset_reason\":\"%s\","
         "\"battery\":{\"present\":%s,\"mv\":%d,\"percent\":%d,\"estimated\":true}}",
         esp_get_idf_version(), app ? app->date : "", app ? app->time : "",
-        (unsigned long long)uptime_ms, (unsigned)heap_free, (unsigned)heap_min,
-        reset_reason_name(esp_reset_reason()), battery ? "true" : "false",
-        battery ? batt_mv : 0, battery ? batt_pct : 0);
-    if (n < 0 || n >= (int)sizeof(b)) return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "overview overflow");
-    httpd_resp_set_type(r, "application/json"); no_cache(r);
+        (unsigned long long)uptime_ms, (unsigned)esp_get_free_heap_size(),
+        (unsigned)esp_get_minimum_free_heap_size(), reset_reason_name(esp_reset_reason()),
+        battery ? "true" : "false", battery ? batt_mv : 0, battery ? batt_pct : 0);
+    if (n < 0 || n >= (int)sizeof(b))
+        return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "overview overflow");
+    httpd_resp_set_type(r, "application/json");
+    no_cache(r);
     return httpd_resp_send(r, b, n);
 }
 
@@ -101,25 +102,34 @@ static void safe_json_name(char *dst, size_t dst_size, const char *src)
     dst[j] = 0;
 }
 
+static esp_err_t finish_chunks(httpd_req_t *r)
+{
+    if (httpd_resp_send_chunk(r, "]}", 2) != ESP_OK) return ESP_FAIL;
+    return httpd_resp_send_chunk(r, NULL, 0);
+}
+
 static esp_err_t admin_storage_get(httpd_req_t *r)
 {
     size_t total = 0, used = 0;
-    if (esp_spiffs_info("storage", &total, &used) != ESP_OK) {
+    if (esp_spiffs_info("storage", &total, &used) != ESP_OK)
         return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "storage unavailable");
-    }
+
     size_t free_b = total > used ? total - used : 0;
     size_t safe = free_b > ADMIN_STORAGE_RESERVE ? free_b - ADMIN_STORAGE_RESERVE : 0;
     if (safe > ADMIN_MAX_FILE_BYTES) safe = ADMIN_MAX_FILE_BYTES;
 
-    httpd_resp_set_type(r, "application/json"); no_cache(r);
+    httpd_resp_set_type(r, "application/json");
+    no_cache(r);
     char head[384];
     int n = snprintf(head, sizeof(head),
         "{\"total\":%u,\"used\":%u,\"free\":%u,\"source_count\":%d,"
         "\"max_sources\":%d,\"max_file_bytes\":%u,\"reserve_bytes\":%u,"
         "\"safe_upload_now\":%u,\"files\":[",
-        (unsigned)total,(unsigned)used,(unsigned)free_b,prisma_storage_count(),ADMIN_MAX_SOURCES,
-        (unsigned)ADMIN_MAX_FILE_BYTES,(unsigned)ADMIN_STORAGE_RESERVE,(unsigned)safe);
-    if (n < 0 || httpd_resp_send_chunk(r, head, n) != ESP_OK) return ESP_FAIL;
+        (unsigned)total, (unsigned)used, (unsigned)free_b, prisma_storage_count(),
+        ADMIN_MAX_SOURCES, (unsigned)ADMIN_MAX_FILE_BYTES,
+        (unsigned)ADMIN_STORAGE_RESERVE, (unsigned)safe);
+    if (n < 0 || n >= (int)sizeof(head) || httpd_resp_send_chunk(r, head, n) != ESP_OK)
+        return ESP_FAIL;
 
     DIR *dir = opendir("/storage");
     bool first = true;
@@ -127,32 +137,38 @@ static esp_err_t admin_storage_get(httpd_req_t *r)
         struct dirent *entry;
         const char *current = prisma_storage_current();
         while ((entry = readdir(dir)) != NULL) {
-            char path[96], clean[64];
             if (!entry->d_name[0]) continue;
+            char path[96], clean[64];
             int plen = snprintf(path, sizeof(path), "/storage/%s", entry->d_name);
             if (plen <= 0 || plen >= (int)sizeof(path)) continue;
             struct stat st;
             if (stat(path, &st) != 0) continue;
             safe_json_name(clean, sizeof(clean), entry->d_name);
             char item[256];
-            int m = snprintf(item, sizeof(item), "%s{\"name\":\"%s\",\"size\":%u,\"source\":%s,\"active\":%s}",
+            int m = snprintf(item, sizeof(item),
+                "%s{\"name\":\"%s\",\"size\":%u,\"source\":%s,\"active\":%s}",
                 first ? "" : ",", clean, (unsigned)st.st_size,
                 is_jpeg(entry->d_name) ? "true" : "false",
                 current && !strcasecmp(current, entry->d_name) ? "true" : "false");
             if (m > 0 && m < (int)sizeof(item)) {
-                if (httpd_resp_send_chunk(r, item, m) != ESP_OK) {closedir(dir); return ESP_FAIL;}
+                if (httpd_resp_send_chunk(r, item, m) != ESP_OK) {
+                    closedir(dir);
+                    return ESP_FAIL;
+                }
                 first = false;
             }
         }
         closedir(dir);
     }
-    return httpd_resp_send_chunk(r, "]}", 2);
+    return finish_chunks(r);
 }
 
 static esp_err_t admin_network_get(httpd_req_t *r)
 {
     wifi_config_t cfg = {0};
-    esp_wifi_get_config(WIFI_IF_AP, &cfg);
+    if (esp_wifi_get_config(WIFI_IF_AP, &cfg) != ESP_OK)
+        return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "wifi config unavailable");
+
     uint8_t channel = 0;
     wifi_second_chan_t second = WIFI_SECOND_CHAN_NONE;
     esp_wifi_get_channel(&channel, &second);
@@ -163,12 +179,12 @@ static esp_err_t admin_network_get(httpd_req_t *r)
     esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
     if (netif) {
         esp_netif_ip_info_t ip = {0};
-        if (esp_netif_get_ip_info(netif, &ip) == ESP_OK) {
+        if (esp_netif_get_ip_info(netif, &ip) == ESP_OK)
             snprintf(ipbuf, sizeof(ipbuf), IPSTR, IP2STR(&ip.ip));
-        }
     }
 
-    httpd_resp_set_type(r, "application/json"); no_cache(r);
+    httpd_resp_set_type(r, "application/json");
+    no_cache(r);
     char head[320];
     int n = snprintf(head, sizeof(head),
         "{\"ssid\":\"%s\",\"ip\":\"%s\",\"channel\":%u,\"auth\":\"%s\","
@@ -176,16 +192,20 @@ static esp_err_t admin_network_get(httpd_req_t *r)
         (char *)cfg.ap.ssid, ipbuf, (unsigned)channel,
         cfg.ap.authmode == WIFI_AUTH_OPEN ? "OPEN" : "PROTECTED",
         (unsigned)cfg.ap.max_connection, (unsigned)stations.num);
-    if (n < 0 || httpd_resp_send_chunk(r, head, n) != ESP_OK) return ESP_FAIL;
+    if (n < 0 || n >= (int)sizeof(head) || httpd_resp_send_chunk(r, head, n) != ESP_OK)
+        return ESP_FAIL;
+
     for (int i = 0; i < stations.num; i++) {
-        char item[160];
         wifi_sta_info_t *s = &stations.sta[i];
+        char item[160];
         int m = snprintf(item, sizeof(item),
             "%s{\"mac\":\"%02X:%02X:%02X:%02X:%02X:%02X\",\"rssi\":%d}",
-            i ? "," : "", s->mac[0],s->mac[1],s->mac[2],s->mac[3],s->mac[4],s->mac[5],(int)s->rssi);
-        if (m > 0 && m < (int)sizeof(item) && httpd_resp_send_chunk(r, item, m) != ESP_OK) return ESP_FAIL;
+            i ? "," : "", s->mac[0], s->mac[1], s->mac[2],
+            s->mac[3], s->mac[4], s->mac[5], (int)s->rssi);
+        if (m > 0 && m < (int)sizeof(item) && httpd_resp_send_chunk(r, item, m) != ESP_OK)
+            return ESP_FAIL;
     }
-    return httpd_resp_send_chunk(r, "]}", 2);
+    return finish_chunks(r);
 }
 
 void prisma_admin_register(httpd_handle_t server)
