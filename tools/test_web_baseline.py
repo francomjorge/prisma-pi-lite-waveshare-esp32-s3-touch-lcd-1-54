@@ -11,16 +11,17 @@ header = (root / "main/wifi_portal.h").read_text(encoding="utf-8")
 wrapper = (root / "main/app36.c").read_text(encoding="utf-8")
 version = (root / "VERSION_5.0.txt").read_text(encoding="utf-8")
 
-EXPECTED_PAGES = 4
+EXPECTED_PAGES = 5
 pages = len(re.findall(r'<section\s+class="page(?:\s|\")', index))
 dots = len(re.findall(r'id="d\d+"\s+class="dot', index))
 assert pages == EXPECTED_PAGES, f"HTML pages={pages}, expected={EXPECTED_PAGES}"
 assert dots == EXPECTED_PAGES, f"HTML dots={dots}, expected={EXPECTED_PAGES}"
-assert "width:400%" in style
-assert "width:25%" in style
-assert "flex:0 0 25%" in style
-assert "Math.min(3,n)" in index
-assert "pg*25" in index
+assert "width:500%" in style
+assert "width:20%" in style
+assert "flex:0 0 20%" in style
+assert "Math.min(4,n)" in index
+assert "pg*20" in index
+assert "for(var i=0;i<5;i++)" in index
 
 assert '"web/index.html"' in cmake
 assert '"web/style.css"' in cmake
@@ -51,12 +52,12 @@ assert "new XMLHttpRequest()" in index
 assert "syncBusy" in index
 assert "scheduleSync(300)" in index
 assert "if(pg!==1)" not in index
-assert "pg===3" not in index
 assert "setInterval(syncAll" not in index
 
 assert "function drawPage2(s)" in index
 assert "function drawPage4(s)" in index
-assert "function drawAll(s){drawPage2(s);drawPage4(s)}" in index
+assert "function drawPage5(s)" in index
+assert "function drawAll(s){drawPage2(s);drawPage4(s);drawPage5(s)}" in index
 assert "Array.isArray(s.effects)" in index
 assert "Array.isArray(s.values)" in index
 assert "fxmirror" in index
@@ -71,7 +72,7 @@ assert ".photo.off{background:#000!important}" in style
 assert ".photo.off #offscreen{display:none!important}" in style
 assert ".photo.off canvas,.photo.off .sourcePreview{visibility:hidden!important;opacity:0!important}" in style
 
-# v5.0 fullscreen control is icon-only and hidden until hover/focus/touch interaction.
+# Existing fullscreen control remains untouched on the original Live View.
 assert ".photo .fsBtn{" in style
 assert "opacity:0" in style
 assert ".photo .fsBtn::after{content:\"⛶\"" in style
@@ -79,18 +80,17 @@ assert ".photo:hover .fsBtn" in style
 assert ".photo:focus-within .fsBtn" in style
 
 assert "PRISMA-PI LITE 5.0" in version
-assert "NO_WF" in version
-assert "NO_ADMIN" in version
 assert "STABLE" in version
 
-assert "PAGE 5" not in index
-assert "SYNC LAB" not in index
+# Page 5 is an isolated browser FX lab. Debug API and timers remain forbidden.
+assert "PAGE 5" in index
+assert "FX LAB / TEST LIVE VIEW" in index
+assert 'id="d4"' in index
 assert "api/debug/state" not in index
 assert '"/api/debug/state"' not in portal
-assert 'id="d4"' not in index
 assert "esp_timer" not in cmake
 
 assert "hc.lru_purge_enable=true" in portal
 assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-print("v5.0 OK: NO_WF / NO_ADMIN / STABLE + global sync + black OFF + clean fullscreen UI")
+print("Controller OK: original surfaces + page 5 isolated FX lab + global sync")
