@@ -2,7 +2,7 @@ name: ESP-IDF build
 
 on:
   push:
-    branches: [main, m4.3-consolidated, m4.3-web4-readonly, m4.4-page2-bidirectional, m4.5-unified-build58-sync, m4.6-page2-build58-readonly, m4.7-page2-direct-readonly, m4.8-sync-lab, m4.9-global-web-sync, m4.10-clean-assets, m4.11-correct-assets-ci, m4.11-controller-stable, v5.0-no-effect-no-admin, v1.1-admin-minimal-3cards, v1.1-admin-sidebar-3tabs, v1.2-page5-fx-lab]
+    branches: [main, m4.3-consolidated, m4.3-web4-readonly, m4.4-page2-bidirectional, m4.5-unified-build58-sync, m4.6-page2-build58-readonly, m4.7-page2-direct-readonly, m4.8-sync-lab, m4.9-global-web-sync, m4.10-clean-assets, m4.11-correct-assets-ci, m4.11-controller-stable, v5.0-no-effect-no-admin, v1.1-admin-minimal-3cards, v1.1-admin-sidebar-3tabs, v1.2-page5-fx-lab, v1.2-page5-fx-lab-liveview-restore]
   workflow_dispatch:
 
 jobs:
