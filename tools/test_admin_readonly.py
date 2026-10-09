@@ -27,6 +27,7 @@ assert '@media(max-width:720px)' in css
 assert 'body.menuOpen .sidebar' in css
 assert 'html[data-theme="alt"]' in css
 assert '.liveWrap' in css
+assert '.wideBtn{' in css
 
 for endpoint in ('/api/state','/api/admin/overview','/api/admin/storage','/api/admin/network'):
     assert endpoint in js or endpoint in api
@@ -45,6 +46,8 @@ assert 'ADMIN_STORAGE_RESERVE (256U * 1024U)' in api
 assert 'esp_wifi_ap_get_sta_list' in api
 assert 'esp_spiffs_info' in api
 assert 'prisma_metrics_battery' in api
+assert 'httpd_resp_send_chunk(r, NULL, 0)' in api
+assert 'finish_chunks(r)' in api
 
 assert 'prisma_admin_register(s);' in portal
 assert 'hc.max_uri_handlers=16;' in portal
@@ -53,4 +56,4 @@ assert '"admin_api.c"' in cmake and '"prisma_metrics.c"' in cmake
 assert 'esp_adc' in cmake
 assert 'ADMIN READ-ONLY / PHASE 1' in version
 
-print('v1.1 admin OK: read-only dashboard + responsive navigation + skin foundation + real device telemetry')
+print('v1.1 admin OK: read-only dashboard + responsive navigation + skins + real telemetry + complete JSON streams')
