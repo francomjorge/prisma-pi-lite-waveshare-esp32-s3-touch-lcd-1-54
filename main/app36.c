@@ -18,10 +18,13 @@
 #undef mode_index
 #undef synth_on
 
-static const char *SYNC_TAG = "PAGE2_DIRECT";
+static const char *SYNC_TAG = "SYNC_LAB";
 
-/* Authoritative Page 2 getters. wifi_portal.c reads these values directly
- * on every /api/state request: no mirror task and no duplicated state. */
+/*
+ * Authoritative appliance getters.
+ * These read the exact variables used by the LCD/touch UI in main.c.
+ * The temporary web Sync Lab calls them on every HTTP request.
+ */
 bool prisma_appliance_get_on(void)
 {
     return prisma_shared_on;
@@ -42,12 +45,25 @@ const char *prisma_appliance_get_filename(void)
     return prisma_storage_current();
 }
 
+bool prisma_appliance_get_effect(int effect)
+{
+    if (effect < 0 || effect >= EFFECT_COUNT) return false;
+    if (effect == 5) return true;
+    return effect_enabled[effect];
+}
+
+int prisma_appliance_get_effect_value(int effect)
+{
+    if (effect < 0 || effect >= EFFECT_COUNT) return 0;
+    return effect_value[effect];
+}
+
 void app_main(void)
 {
     prisma_shared_mode = 0;
     prisma_shared_intensity = 61;
     prisma_storage_init();
 
-    ESP_LOGI(SYNC_TAG, "DIRECT READ-ONLY PAGE2 STATE ACTIVE");
+    ESP_LOGI(SYNC_TAG, "M4.8 SYNC LAB ACTIVE - DIRECT APPLIANCE GETTERS");
     prisma_legacy_main();
 }
