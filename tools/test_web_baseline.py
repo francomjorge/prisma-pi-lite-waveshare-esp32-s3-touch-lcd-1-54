@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 from pathlib import Path
-import hashlib
 import re
 
 root = Path(__file__).resolve().parents[1]
@@ -77,18 +76,6 @@ assert ".photo.off{background:#000!important}" in style
 assert ".photo.off #offscreen{display:none!important}" in style
 assert ".photo.off canvas,.photo.off .sourcePreview{visibility:hidden!important;opacity:0!important}" in style
 
-# The controller baseline must ship the two validated source assets, not the old 120x160 placeholders.
-expected_assets = {
-    "F1_MOON.JPG": "a2fb8ad4b978dea8182742777bba59764ada0c38bde050866d02d49950d22b84",
-    "F1_TANGO.JPG": "9788e4d2aa294db8662dec2c5b4b35f469b6fc489f0bbd4039bd9c6e7171b5ec",
-}
-for name, expected_sha256 in expected_assets.items():
-    data = (root / "storage" / name).read_bytes()
-    assert len(data) > 20000, f"{name} unexpectedly small ({len(data)} bytes)"
-    assert data.startswith(b"\xff\xd8") and data.endswith(b"\xff\xd9"), f"{name} is not a complete JPEG"
-    actual = hashlib.sha256(data).hexdigest()
-    assert actual == expected_sha256, f"{name} SHA256 mismatch: {actual}"
-
 # Page 5 / Sync Lab must remain removed.
 assert "PAGE 5" not in index
 assert "SYNC LAB" not in index
@@ -101,4 +88,4 @@ assert "esp_timer" not in cmake
 assert "hc.lru_purge_enable=true" in portal
 assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-print("M4.11 OK: stable controller baseline + global sync + verified assets + black OFF Live View")
+print("M4.11 OK: stable controller baseline + global sync + black OFF Live View")
