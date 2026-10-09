@@ -110,7 +110,7 @@ assert 'prisma_admin_register(s);' in portal
 assert 'hc.max_uri_handlers=16;' in portal
 assert '"web/admin.html"' in cmake and '"web/admin.css"' in cmake
 assert '"prisma_sensors.c"' in cmake and '"prisma_metrics.c"' in cmake and '"admin_api.c"' in cmake
-assert 'esp_adc' in cmake and 'esp_driver_tsens' in cmake and 'esp_psram' in cmake
+assert 'esp_adc' in cmake and 'esp_driver_tsens' in cmake and 'heap' in cmake and 'spi_flash' in cmake
 assert 'ADMIN READ-ONLY / PHASE 1' in version
 
 print('v1.1 admin OK: inline live telemetry + official Waveshare system/battery/QMI8658 paths + files + read-only UI')
