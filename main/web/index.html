@@ -17,11 +17,39 @@
 <section class="page"><div id="effects" class="effects"><div id="fx0" class="fxrow off"><div class="fxline"><div class="fxname">PIXEL</div><div id="fxv0" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill0" class="fxfill"></div></div></div><div id="fx1" class="fxrow off"><div class="fxline"><div class="fxname">GLITCH</div><div id="fxv1" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill1" class="fxfill"></div></div></div><div id="fx2" class="fxrow off"><div class="fxline"><div class="fxname">POSTER</div><div id="fxv2" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill2" class="fxfill"></div></div></div><div id="fx3" class="fxrow off"><div class="fxline"><div class="fxname">HUE</div><div id="fxv3" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill3" class="fxfill"></div></div></div><div id="fx4" class="fxrow off mirrorRow"><div class="fxline"><div class="fxname">MIRROR</div><div id="fxmirror" class="fxswitch off">OFF</div></div></div><div id="fx5" class="fxrow"><div class="fxline"><div class="fxname">MIX</div><div id="fxv5" class="fxvalue">50</div></div><div class="fxbar"><div id="fxfill5" class="fxfill"></div></div></div></div><div class="hint effectsHint">EFFECTS / READ ONLY</div></section>
 </div></main>
 <div class="dots"><i id="d0" class="dot on"></i><i id="d1" class="dot"></i><i id="d2" class="dot"></i><i id="d3" class="dot"></i></div>
-<div class="hint bottomHint">SWIPE LEFT / RIGHT · PAGE 2 BIDIRECTIONAL</div>
+<div class="hint bottomHint">SWIPE LEFT / RIGHT · STATE SYNC</div>
 <script>
 let pg=0,sx=0,navBlocked=false;const v=document.getElementById('v'),t=document.getElementById('t');
 function page(n){pg=Math.max(0,Math.min(3,n));t.style.transform='translateX(-'+(pg*25)+'%)';for(let i=0;i<4;i++)document.getElementById('d'+i).className='dot'+(i===pg?' on':'');}
-v.addEventListener('touchstart',e=>{navBlocked=!!e.target.closest('[data-control]');if(!navBlocked)sx=e.touches[0].clientX},{passive:true});v.addEventListener('touchend',e=>{if(navBlocked){navBlocked=false;return}const dx=e.changedTouches[0].clientX-sx;if(dx<-45)page(pg+1);if(dx>45)page(pg-1)},{passive:true});
+v.addEventListener('touchstart',e=>{navBlocked=!!e.target.closest('[data-control]');if(!navBlocked)sx=e.touches[0].clientX},{passive:true});
+v.addEventListener('touchend',e=>{if(navBlocked){navBlocked=false;return}const dx=e.changedTouches[0].clientX-sx;if(dx<-45)page(pg+1);if(dx>45)page(pg-1)},{passive:true});
+
+/* Build 58 fallback path: state polling lives in the HTML itself. */
+let legacySource='';
+function legacyClamp(v){v=Number(v);if(!Number.isFinite(v))return 0;return Math.max(0,Math.min(100,Math.round(v)));}
+function legacyApplyState(s){
+ const p=document.getElementById('power'),m=document.getElementById('mode'),f=document.getElementById('fill'),pc=document.getElementById('pct'),fn=document.getElementById('filename'),c=document.getElementById('controls'),photo=document.getElementById('photoFrame'),img=document.getElementById('sourcePreview');
+ const iv=legacyClamp(s.intensity);
+ if(p){p.textContent=s.on?'ON':'OFF';p.className=s.on?'power':'power off';}
+ if(m)m.textContent=s.mode?'BYPASS':'RANDOM';
+ if(f)f.style.width=iv+'%';
+ if(pc)pc.textContent=iv+'%';
+ if(fn)fn.textContent=(s.filename||'F1_MOON.JPG').toUpperCase();
+ if(c)c.className=s.on?'':'disabled';
+ if(photo)photo.classList.toggle('off',!s.on);
+ if(img&&s.filename&&s.filename!==legacySource){legacySource=s.filename;img.style.visibility='visible';img.src='/source/'+encodeURIComponent(s.filename)+'?v='+Date.now();}
+ const en=Array.isArray(s.effects)?s.effects:[false,false,false,false,false,true];
+ const vals=Array.isArray(s.effect_values)?s.effect_values:[50,50,50,50,50,50];
+ const effects=document.getElementById('effects');if(effects)effects.className=s.on?'effects':'effects disabled';
+ for(let i=0;i<6;i++){
+   const row=document.getElementById('fx'+i),isOn=i===5?true:!!en[i];if(row)row.classList.toggle('off',!isOn);
+   if(i===4){const sw=document.getElementById('fxmirror');if(sw){sw.textContent=isOn?'ON':'OFF';sw.className=isOn?'fxswitch':'fxswitch off';}}
+   else{const val=legacyClamp(vals[i]),ve=document.getElementById('fxv'+i),ff=document.getElementById('fxfill'+i);if(ve)ve.textContent=String(val);if(ff)ff.style.width=val+'%';}
+ }
+}
+async function legacySyncState(){try{const r=await fetch('/api/state',{cache:'no-store'});if(!r.ok)return;const s=await r.json();legacyApplyState(s);}catch(e){}}
+setInterval(legacySyncState,300);legacySyncState();
+
 const fsFrame=document.getElementById('photoFrame'),fsButton=document.getElementById('fsBtn');function isRealFs(){return document.fullscreenElement||document.webkitFullscreenElement}function fsLabel(){fsButton.textContent=(isRealFs()||fsFrame.classList.contains('pseudoFull'))?'EXIT FULL SCREEN':'FULL SCREEN'}async function toggleFs(){if(isRealFs()){const exit=document.exitFullscreen||document.webkitExitFullscreen;if(exit)exit.call(document);return}if(fsFrame.classList.contains('pseudoFull')){fsFrame.classList.remove('pseudoFull');fsLabel();return}try{if(fsFrame.requestFullscreen){await fsFrame.requestFullscreen();return}if(fsFrame.webkitRequestFullscreen){fsFrame.webkitRequestFullscreen();return}}catch(e){}fsFrame.classList.add('pseudoFull');fsLabel()}fsButton.addEventListener('click',toggleFs);document.addEventListener('fullscreenchange',fsLabel);document.addEventListener('webkitfullscreenchange',fsLabel);
 </script>
 <script src="/app.js"></script>
