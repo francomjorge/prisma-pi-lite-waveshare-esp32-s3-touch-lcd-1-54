@@ -21,7 +21,7 @@ assert "flex:0 0 25%" in style
 assert "Math.min(3,n)" in index
 assert "pg*25" in index
 
-# Single active web source.
+# Single embedded web source.
 assert '"web/index.html"' in cmake
 assert '"web/style.css"' in cmake
 assert '"web/app.js"' not in cmake
@@ -29,35 +29,57 @@ assert '<script src="/app.js"></script>' not in index
 assert '"/app.js"' not in portal
 assert '"/api/control"' not in portal
 
-# Page 2 must keep using the direct authoritative appliance state.
+# The stable /api/state path is authoritative for Page 2 and Page 4.
 for symbol in (
     "prisma_appliance_get_on",
     "prisma_appliance_get_mode",
     "prisma_appliance_get_intensity",
     "prisma_appliance_get_filename",
+    "prisma_appliance_get_effect",
+    "prisma_appliance_get_effect_value",
 ):
     assert symbol in header, f"missing declaration {symbol}"
     assert symbol in wrapper, f"missing direct getter {symbol}"
-    assert symbol in portal, f"Page 2 API not using {symbol}"
+    assert symbol in portal, f"state API not using {symbol}"
 
 assert '"/api/state"' in portal
+assert '"effects"' in portal
+assert '"values"' in portal
+assert "char b[640]" in portal
+
+# Browser must use one serialized polling loop regardless of selected page.
 assert "'/api/state?ts='+Date.now()" in index
 assert "new XMLHttpRequest()" in index
-assert "if(pg!==1)" in index
-assert "x.timeout=1500" in index
-assert "p2Timer=setTimeout(syncPage2,300)" in index
+assert "syncBusy" in index
+assert "scheduleSync(300)" in index
+assert "if(pg!==1)" not in index
+assert "pg===3" not in index
+assert "setInterval(syncAll" not in index
 
-# Page 3 source preview remains available and Page 5 is gone.
+# Page 2 and Page 4 renderers both consume the same snapshot.
+assert "function drawPage2(s)" in index
+assert "function drawPage4(s)" in index
+assert "function drawAll(s){drawPage2(s);drawPage4(s)}" in index
+assert "Array.isArray(s.effects)" in index
+assert "Array.isArray(s.values)" in index
+assert "fxmirror" in index
+
+# Page 3 source preview is updated from the same global state even while visible.
 assert 'id="sourcePreview"' in index
 assert 'id="fsBtn"' in index
 assert '"/source/*"' in portal
+assert "setSource(s.filename)" in index
+
+# Page 5 / Sync Lab must remain removed.
 assert "PAGE 5" not in index
 assert "SYNC LAB" not in index
 assert "api/debug/state" not in index
+assert '"/api/debug/state"' not in portal
 assert 'id="d4"' not in index
+assert "esp_timer" not in cmake
 
-# Keep the HTTP server conservative for AP stability.
+# Conservative HTTP server settings retained for AP stability.
 assert "hc.lru_purge_enable=true" in portal
 assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-print("M4.8 stable OK: 4-page shell + Page 2 direct live sync + Page 3 source preview")
+print("M4.9 OK: four pages + global serialized sync + Page 2/Page 4 authoritative state")
