@@ -9,14 +9,11 @@
 #include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_wifi.h"
-#include "esp_timer.h"
-#include "esp_system.h"
 #include "nvs_flash.h"
 
 static const char *TAG = "PRISMA_WIFI";
 
-/* Legacy state is intentionally retained during M4.8 so the temporary
- * Sync Lab page can compare it with the real appliance variables. */
+/* Legacy/shared state remains available for the existing appliance code. */
 static volatile bool control_on = true;
 static volatile int control_mode = 0;
 static volatile int control_intensity = 61;
@@ -61,8 +58,10 @@ static esp_err_t send_embedded(httpd_req_t*r,const char*type,const uint8_t*s,con
 static esp_err_t page_get(httpd_req_t*r){return send_embedded(r,"text/html",web_index_html_start,web_index_html_end);}
 static esp_err_t css_get(httpd_req_t*r){return send_embedded(r,"text/css",web_style_css_start,web_style_css_end);}
 
-/* Existing Page 2 endpoint. Kept untouched for comparison with the new
- * independent Sync Lab endpoint below. */
+/*
+ * Single authoritative state endpoint for every web surface.
+ * Page 2, Page 3 source preview and Page 4 all consume this same snapshot.
+ */
 static esp_err_t state_get(httpd_req_t*r)
 {
     static bool have_last = false;
@@ -70,16 +69,30 @@ static esp_err_t state_get(httpd_req_t*r)
     static int last_mode = -1;
     static int last_intensity = -1;
     static char last_filename[32] = "";
+    static bool last_effects[6] = {false,false,false,false,false,false};
+    static int last_values[6] = {-1,-1,-1,-1,-1,-1};
     static int generation = 0;
 
     bool on = prisma_appliance_get_on();
     int mode = prisma_appliance_get_mode() ? 1 : 0;
     int intensity = prisma_appliance_get_intensity();
     const char *filename = prisma_appliance_get_filename();
+    bool effects[6];
+    int values[6];
+
     if (!filename || !*filename) filename = "F1_MOON.JPG";
+    for (int i=0;i<6;i++) {
+        effects[i] = prisma_appliance_get_effect(i);
+        values[i] = prisma_appliance_get_effect_value(i);
+    }
+    effects[5] = true;
 
     bool changed = !have_last || last_on != on || last_mode != mode ||
                    last_intensity != intensity || strcmp(last_filename, filename) != 0;
+    for (int i=0;i<6;i++) {
+        if (last_effects[i] != effects[i] || last_values[i] != values[i]) changed = true;
+    }
+
     if (changed) {
         generation++;
         if (generation <= 0) generation = 1;
@@ -87,9 +100,13 @@ static esp_err_t state_get(httpd_req_t*r)
         last_mode = mode;
         last_intensity = intensity;
         strlcpy(last_filename, filename, sizeof(last_filename));
+        for (int i=0;i<6;i++) {
+            last_effects[i] = effects[i];
+            last_values[i] = values[i];
+        }
         have_last = true;
         ESP_LOGI(TAG,
-                 "PAGE2 GET TX gen=%d on=%s source=%s intensity=%d mode=%s",
+                 "WEB STATE gen=%d on=%s source=%s intensity=%d mode=%s",
                  generation,
                  on ? "ON" : "OFF",
                  filename,
@@ -97,10 +114,15 @@ static esp_err_t state_get(httpd_req_t*r)
                  mode ? "BYPASS" : "RANDOM");
     }
 
-    char b[256];
+    char b[640];
     int n = snprintf(b,sizeof(b),
-             "{\"on\":%s,\"mode\":%d,\"intensity\":%d,\"generation\":%d,\"filename\":\"%s\"}",
-             on ? "true" : "false", mode, intensity, generation, filename);
+             "{\"on\":%s,\"mode\":%d,\"intensity\":%d,\"generation\":%d,\"filename\":\"%s\","
+             "\"effects\":[%s,%s,%s,%s,%s,true],"
+             "\"values\":[%d,%d,%d,%d,%d,%d]}",
+             on ? "true" : "false", mode, intensity, generation, filename,
+             effects[0]?"true":"false", effects[1]?"true":"false", effects[2]?"true":"false",
+             effects[3]?"true":"false", effects[4]?"true":"false",
+             values[0],values[1],values[2],values[3],values[4],values[5]);
     if (n < 0 || n >= (int)sizeof(b)) {
         httpd_resp_send_err(r,HTTPD_500_INTERNAL_SERVER_ERROR,"state overflow");
         return ESP_FAIL;
@@ -108,123 +130,6 @@ static esp_err_t state_get(httpd_req_t*r)
 
     httpd_resp_set_type(r,"application/json");
     no_cache(r);
-    return httpd_resp_send(r,b,n);
-}
-
-typedef struct {
-    bool on;
-    int mode;
-    int intensity;
-    char filename[32];
-    bool effects[6];
-    int values[6];
-} sync_snapshot_t;
-
-static void read_direct(sync_snapshot_t *s)
-{
-    memset(s,0,sizeof(*s));
-    s->on = prisma_appliance_get_on();
-    s->mode = prisma_appliance_get_mode() ? 1 : 0;
-    s->intensity = prisma_appliance_get_intensity();
-    const char *filename = prisma_appliance_get_filename();
-    if (!filename || !*filename) filename = "F1_MOON.JPG";
-    strlcpy(s->filename,filename,sizeof(s->filename));
-    for (int i=0;i<6;i++) {
-        s->effects[i] = prisma_appliance_get_effect(i);
-        s->values[i] = prisma_appliance_get_effect_value(i);
-    }
-    s->effects[5] = true;
-}
-
-static void read_legacy(sync_snapshot_t *s)
-{
-    memset(s,0,sizeof(*s));
-    s->on = control_on;
-    s->mode = control_mode ? 1 : 0;
-    s->intensity = control_intensity;
-    strlcpy(s->filename,control_filename,sizeof(s->filename));
-    for (int i=0;i<6;i++) {
-        s->effects[i] = (i==5) ? true : control_effects[i];
-        s->values[i] = control_effect_values[i];
-    }
-}
-
-static bool snapshots_equal(const sync_snapshot_t *a,const sync_snapshot_t *b)
-{
-    if (a->on != b->on || a->mode != b->mode || a->intensity != b->intensity ||
-        strcmp(a->filename,b->filename) != 0) return false;
-    for (int i=0;i<6;i++) {
-        if (a->effects[i] != b->effects[i] || a->values[i] != b->values[i]) return false;
-    }
-    return true;
-}
-
-/*
- * Independent diagnostic endpoint.
- * - Reads the actual appliance variables directly on every request.
- * - Returns a monotonically increasing HTTP request id.
- * - Returns state_seq, which only increments when the direct appliance state changes.
- * - Includes the old mirrored/copy state for visual comparison.
- * - Logs EVERY request to serial so we can prove whether the browser is still polling.
- */
-static esp_err_t debug_state_get(httpd_req_t *r)
-{
-    static uint32_t request_id = 0;
-    static uint32_t state_seq = 0;
-    static bool have_last = false;
-    static sync_snapshot_t last_direct;
-
-    sync_snapshot_t direct;
-    sync_snapshot_t legacy;
-    read_direct(&direct);
-    read_legacy(&legacy);
-
-    if (!have_last || !snapshots_equal(&direct,&last_direct)) {
-        state_seq++;
-        last_direct = direct;
-        have_last = true;
-    }
-    request_id++;
-
-    uint64_t uptime_ms = (uint64_t)(esp_timer_get_time()/1000ULL);
-    uint32_t free_heap = esp_get_free_heap_size();
-    bool match = snapshots_equal(&direct,&legacy);
-
-    char b[1536];
-    int n = snprintf(b,sizeof(b),
-        "{"
-        "\"request_id\":%lu,\"state_seq\":%lu,\"uptime_ms\":%llu,\"free_heap\":%lu,\"match\":%s,"
-        "\"direct\":{\"on\":%s,\"mode\":%d,\"intensity\":%d,\"filename\":\"%s\","
-        "\"effects\":[%s,%s,%s,%s,%s,true],\"values\":[%d,%d,%d,%d,%d,%d]},"
-        "\"legacy\":{\"on\":%s,\"mode\":%d,\"intensity\":%d,\"filename\":\"%s\","
-        "\"effects\":[%s,%s,%s,%s,%s,true],\"values\":[%d,%d,%d,%d,%d,%d]}"
-        "}",
-        (unsigned long)request_id,(unsigned long)state_seq,(unsigned long long)uptime_ms,
-        (unsigned long)free_heap,match?"true":"false",
-        direct.on?"true":"false",direct.mode,direct.intensity,direct.filename,
-        direct.effects[0]?"true":"false",direct.effects[1]?"true":"false",direct.effects[2]?"true":"false",
-        direct.effects[3]?"true":"false",direct.effects[4]?"true":"false",
-        direct.values[0],direct.values[1],direct.values[2],direct.values[3],direct.values[4],direct.values[5],
-        legacy.on?"true":"false",legacy.mode,legacy.intensity,legacy.filename,
-        legacy.effects[0]?"true":"false",legacy.effects[1]?"true":"false",legacy.effects[2]?"true":"false",
-        legacy.effects[3]?"true":"false",legacy.effects[4]?"true":"false",
-        legacy.values[0],legacy.values[1],legacy.values[2],legacy.values[3],legacy.values[4],legacy.values[5]);
-
-    if (n < 0 || n >= (int)sizeof(b)) {
-        ESP_LOGE(TAG,"SYNC_LAB JSON overflow");
-        httpd_resp_send_err(r,HTTPD_500_INTERNAL_SERVER_ERROR,"debug state overflow");
-        return ESP_FAIL;
-    }
-
-    ESP_LOGI(TAG,
-             "SYNC_LAB GET req=%lu seq=%lu match=%s direct[%s %s %d %s] legacy[%s %s %d %s]",
-             (unsigned long)request_id,(unsigned long)state_seq,match?"YES":"NO",
-             direct.on?"ON":"OFF",direct.filename,direct.intensity,direct.mode?"BYPASS":"RANDOM",
-             legacy.on?"ON":"OFF",legacy.filename,legacy.intensity,legacy.mode?"BYPASS":"RANDOM");
-
-    httpd_resp_set_type(r,"application/json");
-    no_cache(r);
-    httpd_resp_set_hdr(r,"Connection","close");
     return httpd_resp_send(r,b,n);
 }
 
@@ -285,15 +190,13 @@ static void start_portal(void)
         httpd_uri_t a={.uri="/",.method=HTTP_GET,.handler=page_get};
         httpd_uri_t b={.uri="/api/state",.method=HTTP_GET,.handler=state_get};
         httpd_uri_t c={.uri="/style.css",.method=HTTP_GET,.handler=css_get};
-        httpd_uri_t d={.uri="/api/debug/state",.method=HTTP_GET,.handler=debug_state_get};
-        httpd_uri_t e={.uri="/source/*",.method=HTTP_GET,.handler=source_get};
+        httpd_uri_t d={.uri="/source/*",.method=HTTP_GET,.handler=source_get};
         httpd_register_uri_handler(s,&a);
         httpd_register_uri_handler(s,&b);
         httpd_register_uri_handler(s,&c);
         httpd_register_uri_handler(s,&d);
-        httpd_register_uri_handler(s,&e);
     }
-    ESP_LOGI(TAG,"PRISMA LITE M4.8 Sync Lab: %s - http://192.168.4.1",ap);
+    ESP_LOGI(TAG,"PRISMA LITE M4.9 Global Web Sync: %s - http://192.168.4.1",ap);
 }
 
 void prisma_wifi_start(void)
