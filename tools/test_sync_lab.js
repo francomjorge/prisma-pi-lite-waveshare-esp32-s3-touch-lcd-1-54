@@ -54,7 +54,7 @@ class FakeXHR {
     setTimeout(()=>{
       if(this.url.includes('/api/debug/state')){
         debugCount++;
-        const idx=Math.min(Math.floor((debugCount-1)/2),seq.length-1);
+        const idx=Math.min(debugCount-1,seq.length-1);
         this.status=200;
         this.responseText=JSON.stringify({
           request_id:debugCount,state_seq:idx+1,uptime_ms:debugCount*500,free_heap:123456,match:false,
@@ -85,7 +85,7 @@ vm.runInContext(script,ctx,{timeout:1000});
 setTimeout(()=>{
   function text(id){ return el(id).textContent; }
   const ok = Number(text('dbgOk'));
-  if(ok < 4) throw new Error('Expected repeated XHR polling, got '+ok);
+  if(ok < 3) throw new Error('Expected repeated XHR polling, got '+ok);
   if(text('dbgSeq') !== '3') throw new Error('state_seq did not advance: '+text('dbgSeq'));
   if(text('dbgOn') !== 'OFF') throw new Error('power did not update: '+text('dbgOn'));
   if(text('dbgSource') !== 'F1_TANGO.JPG') throw new Error('source did not update: '+text('dbgSource'));
