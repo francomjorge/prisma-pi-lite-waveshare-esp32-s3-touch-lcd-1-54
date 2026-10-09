@@ -46,7 +46,7 @@ assert "R ROTATE" in index
 assert "function toggleFs()" in index
 assert "fsButton.addEventListener('click',toggleFs)" in index
 
-# LAB fullscreen is reversible from F and the overlay button, with pseudo fullscreen fallback.
+# LAB fullscreen remains reversible from F and the overlay button.
 assert 'id="labFsBtn"' in index
 assert 'aria-label="Toggle FX Lab fullscreen"' in index
 assert "function toggleLabFs()" in index
@@ -118,24 +118,24 @@ assert "draggable=true" in index
 assert "prismaFxLabOrderV0" in index
 assert "BROWSER GRAPHICS PIPELINE" in index
 assert "ORDER = PROCESSING ORDER" in index
-assert "MIX IS GLOBAL / FIXED LAST" in index
+assert "MIRROR + MIX FIXED LAST" in index
 assert "new Image(" not in index
 assert "fetch('/source/" not in index
 assert "XMLHttpRequest" in index
 assert "api/debug/state" not in index
 assert '"/api/debug/state"' not in portal
 
-# FX ENGINE V2: native A/B/scratch pipeline with PIXEL + GLITCH active in reorderable sequence.
-assert "FX ENGINE V2" in index
+# FX ENGINE V3: all five browser-native processors are now active.
+assert "FX ENGINE V3" in index
 assert "fxBufferA=document.createElement('canvas')" in index
 assert "fxBufferB=document.createElement('canvas')" in index
 assert "fxScratch=document.createElement('canvas')" in index
-assert "version:'2'" in index
+assert "version:'3'" in index
 assert "0:{id:'pixel',process:processPixelFx}" in index
 assert "1:{id:'glitch',process:processGlitchFx}" in index
-assert "2:{id:'poster',process:null}" in index
-assert "3:{id:'hue',process:null}" in index
-assert "4:{id:'mirror',process:null}" in index
+assert "2:{id:'poster',process:processPosterFx}" in index
+assert "3:{id:'hue',process:processHueFx}" in index
+assert "4:{id:'mirror',process:processMirrorFx}" in index
 assert "fxEngine.resize(w,h)" in index
 assert "mixGain:function(v){return clamp100(v)/50}" in index
 
@@ -146,34 +146,50 @@ assert "function processPixelFx(src,dst,value,context)" in index
 assert "effective=clamp100(value*context.mixGain)" in index
 assert "imageSmoothingEnabled=false" in index
 
-# GLITCH V1 is browser-native slice displacement + color ghost, using the same MIX gain.
+# GLITCH V1 remains browser-native slice displacement + color ghost.
 assert "function glitchHash(n)" in index
 assert "function processGlitchFx(src,dst,value,context)" in index
-assert "effective=clamp100(value*context.mixGain)" in index
 assert "bands=2+Math.round(strength*16)" in index
 assert "maxShift=Math.max(1,Math.round(src.width*(.004+.075*strength)))" in index
 assert "dctx.rect(0,sy,dst.width,bh)" in index
 assert "globalCompositeOperation='screen'" in index
-assert "hue-rotate(95deg) saturate(180%)" in index
-assert "hue-rotate(265deg) saturate(180%)" in index
 
-# The same A/B pipeline applies processors in LAB order and rerenders immediately when reordered.
+# POSTER V1 quantizes RGB levels using the same MIX sensitivity.
+assert "function processPosterFx(src,dst,value,context)" in index
+assert "levels=Math.max(2,Math.round(24-(effective/100)*22))" in index
+assert "getImageData(0,0,dst.width,dst.height)" in index
+assert "putImageData(frame,0,0)" in index
+
+# HUE V1 and MIRROR V1 use native Canvas transforms/filters.
+assert "function processHueFx(src,dst,value,context)" in index
+assert "hue-rotate('+Math.round(effective*2.7)+'deg)'" in index
+assert "function processMirrorFx(src,dst,value,context)" in index
+assert "dctx.translate(dst.width,0)" in index
+assert "dctx.scale(-1,1)" in index
+
+# The same A/B pipeline applies processors in order; MIRROR then MIX are fixed at the end.
 assert "function renderRotatedSource(" in index
 assert "function runFxPipeline(s)" in index
 assert "for(var i=0;i<labFxOrder.length-1;i++)" in index
 assert "node.process(src,dst,labEffectValue(s,fx)" in index
 assert "var output=runFxPipeline(latestState)" in index
 assert "renderLabPipeline(latestState);renderLabPreview()" in index
-
-# MIX remains global metadata, normalized to final slot, never draggable/reorderable.
 assert "function normalizeLabOrder(order)" in index
-assert "out.push(5)" in index
-assert "if(fx===5)return" in index
-assert "slice(0,-1).reverse()" in index
-assert "function appendLabMixBlock(s)" in index
+assert "fx>=0&&fx<=3" in index
+assert "out.push(4);out.push(5)" in index
+assert "if(fx>=4)return" in index
+assert "slice(0,-2).reverse()" in index
+assert "movable.concat([4,5])" in index
+
+# Dedicated fixed second row is MIRROR first, then MIX.
+assert "labOrderRow" in index
+assert "labFixedRow" in index
+assert "function appendLabMirrorBlock(s,row)" in index
+assert "function appendLabMixBlock(s,row)" in index
+assert "appendLabMirrorBlock(s,fixedRow);appendLabMixBlock(s,fixedRow)" in index
 assert "block.draggable=false" in index
+assert "block.dataset.fx='4'" in index
 assert "block.dataset.fx='5'" in index
-assert "appendLabMixBlock(s)" in index
 
 assert ".photo.off{background:#000!important}" in style
 assert ".photo.off #offscreen{display:none!important}" in style
@@ -197,4 +213,4 @@ assert "esp_timer" in cmake
 assert "hc.lru_purge_enable=true" in portal
 assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-print("V0 protected + FX Engine V2 OK: PIXEL + ordered GLITCH + reversible LAB fullscreen")
+print("V0 protected + FX Engine V3 OK: PIXEL + GLITCH + POSTER + HUE + fixed MIRROR/MIX row")
