@@ -79,7 +79,9 @@ assert ".photo:hover .fsBtn" in style
 assert ".photo:focus-within .fsBtn" in style
 
 assert "PRISMA-PI LITE 5.0" in version
-assert "NO EFFECT / NO ADMIN" in version
+assert "NO_WF" in version
+assert "NO_ADMIN" in version
+assert "STABLE" in version
 
 assert "PAGE 5" not in index
 assert "SYNC LAB" not in index
@@ -91,4 +93,4 @@ assert "esp_timer" not in cmake
 assert "hc.lru_purge_enable=true" in portal
 assert "no-store, no-cache, must-revalidate, max-age=0" in portal
 
-print("v5.0 OK: No Effect / No Admin + global sync + black OFF + clean fullscreen UI")
+print("v5.0 OK: NO_WF / NO_ADMIN / STABLE + global sync + black OFF + clean fullscreen UI")
