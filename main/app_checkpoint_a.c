@@ -94,7 +94,8 @@ void app_main(void)
     bool touch=prisma_touch_init();ESP_LOGI(SYNC_TAG,"TOUCH: %s",touch?"READY":"FAILED");prisma_wifi_start();for(int i=0;i<EFFECT_COUNT;i++)prisma_control_set_effect(i,effect_enabled[i]);
     int page=0;uint16_t x=0,y=0,startx=0,starty=0;bool down=false;bool input_lock=false;int input_lock_ticks=0;int miss=0,anim=0,home_cooldown=0;
     while(1){
-        if(home_cooldown>0)home_cooldown--;bool touched=touch&&prisma_touch_read(&x,&y);
+        if(home_cooldown>0)home_cooldown--;
+        bool touched=touch&&prisma_touch_read(&x,&y);
         if(input_lock){down=false;miss=0;if(touched)input_lock_ticks=CONTROL_DEBOUNCE_TICKS;else if(input_lock_ticks>0)input_lock_ticks--;else input_lock=false;}
         else if(touched){miss=0;if(!down){startx=x;starty=y;down=true;}else if((int)startx-(int)x>55&&page<CP_PAGE_COUNT-1){page++;glitch_count=0;cp_draw_page(page,phase);down=false;if(cp_page_needs_input_debounce(page)){input_lock=true;input_lock_ticks=CONTROL_DEBOUNCE_TICKS;}}else if((int)x-(int)startx>55&&page>0){page--;glitch_count=0;if(page==0)home_cooldown=HOME_COOLDOWN_TICKS;cp_draw_page(page,phase);down=false;if(cp_page_needs_input_debounce(page)){input_lock=true;input_lock_ticks=CONTROL_DEBOUNCE_TICKS;}}}
         else if(down&&++miss>4){
