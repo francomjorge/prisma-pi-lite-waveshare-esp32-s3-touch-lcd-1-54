@@ -10,11 +10,14 @@ index=(root/'main/web/index.html').read_text(encoding='utf-8')
 cmake=(root/'main/CMakeLists.txt').read_text(encoding='utf-8')
 app=(root/'main/app_checkpoint_a.c').read_text(encoding='utf-8')
 portal=(root/'main/wifi_portal_checkpoint_a.c').read_text(encoding='utf-8')
+intensity_portal=(root/'main/wifi_portal_intensity.c').read_text(encoding='utf-8')
 legacy_portal=(root/'main/wifi_portal.c').read_text(encoding='utf-8')
 
-# Physical appliance remains the physically validated six-page checkpoint.
-assert '"app_checkpoint_a.c"' in cmake and '"wifi_portal_checkpoint_a.c"' in cmake
+# Physical appliance remains the six-page checkpoint, with the intensity UI layered on page 2.
+assert '"app_checkpoint_a.c"' in cmake and '"wifi_portal_intensity.c"' in cmake
+assert '"wifi_portal_checkpoint_a.c"' not in cmake.split('SRCS',1)[1].split('INCLUDE_DIRS',1)[0]
 assert '#include "main.c"' in app and '#include "wifi_portal.c"' in portal
+assert '#include "wifi_portal_checkpoint_a.c"' in intensity_portal
 assert '#define CP_PAGE_COUNT 6' in app
 assert 'int xs[6]={76,92,108,124,140,156}' in app
 assert 'cp_page_fx_lab' in app and 'cp_page_motion' in app
@@ -53,7 +56,7 @@ assert 'PURPLE = MIXED FX · ORANGE = MOTION' in portal
 
 # FX Lab frame still exists but visually merges into the page background.
 assert '.labFrame{background:#04070c!important;border-color:#04070c!important;box-shadow:none!important}' in portal
-assert '.labFrame .labFsBtn{opacity:0!important' in portal
+assert '.labFrame .labFsBtn' in portal and 'opacity:0!important' in portal
 
 # Existing static algorithms stay untouched in index.html.
 for fn in ('processPixelFx','processGlitchFx','processPosterFx','processHueFx','processMirrorFx'):
@@ -85,7 +88,7 @@ assert 'motionFeedback.width!==dst.width' in portal
 assert 'currentSource!==motionFeedbackSource' in portal
 assert 'context.time-motionFeedbackLast>250' in portal
 
-# Reconstruct injected JS and validate syntax.
+# Reconstruct the base injected JS and validate syntax.
 match=re.search(r'static const char checkpoint_web_injection\[\]\s*=\s*(.*?);\n\nstatic esp_err_t checkpoint_page_get',portal,re.S)
 assert match
 literals=re.findall(r'"(?:\\.|[^"\\])*"',match.group(1))
@@ -97,4 +100,4 @@ with tempfile.NamedTemporaryFile('w',suffix='.js',encoding='utf-8',delete=False)
 subprocess.run(['node','--check',js_path],check=True)
 Path(js_path).unlink(missing_ok=True)
 
-print('Motion V1 protected: purple static/MIX, orange motion, six browser processors, unified order')
+print('Checkpoint protected: six pages, unified FX/Motion pipeline, master behavior and intensity wrapper layering')
