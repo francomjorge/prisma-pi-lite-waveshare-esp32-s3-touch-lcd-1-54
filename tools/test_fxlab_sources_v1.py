@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 from pathlib import Path
+import ast
+import re
+import shutil
+import subprocess
+import tempfile
 
 root = Path(__file__).resolve().parents[1]
 web = (root / 'main' / 'wifi_portal_intensity.c').read_text(encoding='utf-8')
@@ -47,6 +52,27 @@ assert 'drawContain(ctx,layer.media,w,h)' in web
 assert 'SPIFFS' in web  # comment explicitly states files are not written there
 assert 'nvs_set' not in web
 
+# Reconstruct the adjacent C string literals and syntax-check the injected JS.
+block = web.split('static const char fxlab_sources_web_injection[] =', 1)[1]
+block = block.split(';\n\nstatic esp_err_t checkpoint_page_get', 1)[0]
+parts = []
+for line in block.splitlines():
+    line = line.strip()
+    if line.startswith('"') and line.endswith('"'):
+        parts.append(ast.literal_eval(line))
+injection = ''.join(parts)
+assert '<style>' in injection and '<script>' in injection
+scripts = re.findall(r'<script>(.*?)</script>', injection, re.S)
+assert len(scripts) == 1
+if shutil.which('node'):
+    with tempfile.NamedTemporaryFile('w', suffix='.js', encoding='utf-8', delete=False) as f:
+        f.write(scripts[0])
+        js_path = f.name
+    try:
+        subprocess.run(['node', '--check', js_path], check=True)
+    finally:
+        Path(js_path).unlink(missing_ok=True)
+
 # Stable appliance preset/control code must still contain the known V3 values.
 for token in (
     '/* 1G */ {{false,false,false,true,false}, { 0, 6,15,12,50,45}',
@@ -58,4 +84,4 @@ for token in (
 ):
     assert token in app
 
-print('FX Lab Sources V1 protected: scroll, I/O zoom, fixed Live View, local MP4 layers, opacity/visibility')
+print('FX Lab Sources V1 protected: scroll, I/O zoom, fixed Live View, local MP4 layers, opacity/visibility, JS syntax')
