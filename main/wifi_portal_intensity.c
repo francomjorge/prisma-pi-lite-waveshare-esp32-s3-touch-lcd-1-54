@@ -1,6 +1,9 @@
 #include "esp_http_server.h"
 
-static esp_err_t checkpoint_page_get(httpd_req_t *r);
+#ifndef PRISMA_INTENSITY_PAGE_GET
+#define PRISMA_INTENSITY_PAGE_GET checkpoint_page_get
+#endif
+static esp_err_t PRISMA_INTENSITY_PAGE_GET(httpd_req_t *r);
 
 #define checkpoint_page_get(...) intensity_base_page_get(__VA_ARGS__)
 #include "wifi_portal_checkpoint_a.c"
@@ -87,7 +90,7 @@ static const char fxlab_sources_web_injection[] =
 "renderSources();applyLabZoom();\n"
 "})();</script>\n";
 
-static esp_err_t checkpoint_page_get(httpd_req_t *r)
+static esp_err_t PRISMA_INTENSITY_PAGE_GET(httpd_req_t *r)
 {
     (void)intensity_base_page_get;
     const char needle[]="</body>";
