@@ -29,16 +29,20 @@ apply_block=app.split('static void cp_apply_intensity_preset(int state)',1)[1].s
 assert 'if(state<=0||state>9)return;' in apply_block
 assert apply_block.index('if(state<=0||state>9)return;') < apply_block.index('effect_enabled[i]=p->fx_enabled[i]')
 
-# Nine curated presets exist and progressively raise glitch / shake / feedback.
+# Nine curated presets exist; pixel is intentionally absent in 1G/1Y/1R/2G/3G.
 assert 'static const cp_intensity_preset_t intensity_presets[9]' in app
 for label in ('/* 1G */','/* 1Y */','/* 1R */','/* 2G */','/* 2Y */','/* 2R */','/* 3G */','/* 3Y */','/* 3R */'):
     assert label in app
 for expected in (
-    '{18, 6,15,12,50,45}',
-    '{30,16,28,30,50,52}',
-    '{50,43,50,64,50,68}',
-    '{66,68,68,85,50,84}',
-    '{78,86,80,96,50,95}',
+    '{{false,false,false,true,false}, { 0, 6,15,12,50,45}',
+    '{{false,false,true,true,false},  { 0,10,22,20,50,48}',
+    '{{false,true,true,true,false},   { 0,16,28,30,50,52}',
+    '{{false,true,true,true,false},   { 0,24,34,40,50,56}',
+    '{{true,true,true,true,false},    {22,33,42,52,50,62}',
+    '{{true,true,true,true,true},     {25,43,50,64,50,68}',
+    '{{false,true,true,true,true},    { 0,54,58,74,50,75}',
+    '{{true,true,true,true,true},     {53,68,68,85,50,84}',
+    '{{true,true,true,true,true},     {62,86,80,96,50,95}',
     '{60,48,38,56,30,62}',
     '{74,62,52,74,46,86}',
 ):
@@ -98,4 +102,4 @@ with tempfile.NamedTemporaryFile('w',suffix='.js',encoding='utf-8',delete=False)
 subprocess.run(['node','--check',path],check=True)
 Path(path).unlink(missing_ok=True)
 
-print('Intensity presets V2 protected: 0 no-op, nine curated presets, manual override preserved, web color reflection')
+print('Intensity presets V2 pixel tune protected: selective pixel OFF and reduced yellow/red pixel values')
