@@ -36,10 +36,52 @@ static const char *motion_names[MOTION_COUNT] = {"PULSE","DRIFT","ROTATE","WAVE"
 static int intensity_button = 0;
 static int intensity_level = 0;
 
+typedef struct {
+    bool fx_enabled[5];
+    int fx_value[6];
+    bool motion_enabled[MOTION_COUNT];
+    int motion_value[MOTION_COUNT];
+} cp_intensity_preset_t;
+
+/*
+ * Progressive V1 presets. State 0 is FREE and never changes user values.
+ * States 1..9 map to 1G,1Y,1R,2G,2Y,2R,3G,3Y,3R.
+ */
+static const cp_intensity_preset_t intensity_presets[9] = {
+    /* 1G */ {{true,false,false,true,false},  {18, 6,15,12,50,45}, {true,false,false,false,false,false}, {12, 6, 4, 5, 0, 5}},
+    /* 1Y */ {{true,false,true,true,false},   {24,10,22,20,50,48}, {true,true,false,false,false,false},  {18,10, 5, 8, 0, 8}},
+    /* 1R */ {{true,true,true,true,false},    {30,16,28,30,50,52}, {true,true,false,true,false,false},   {24,14, 6,12, 0,10}},
+    /* 2G */ {{true,true,true,true,false},    {36,24,34,40,50,56}, {true,true,false,true,true,false},    {30,20,10,18, 7,14}},
+    /* 2Y */ {{true,true,true,true,false},    {43,33,42,52,50,62}, {true,true,true,true,true,false},     {36,26,14,25,10,20}},
+    /* 2R */ {{true,true,true,true,true},     {50,43,50,64,50,68}, {true,true,true,true,true,true},      {43,32,20,32,14,28}},
+    /* 3G */ {{true,true,true,true,true},     {58,54,58,74,50,75}, {true,true,true,true,true,true},      {50,38,28,42,20,38}},
+    /* 3Y */ {{true,true,true,true,true},     {66,68,68,85,50,84}, {true,true,true,true,true,true},      {60,48,38,56,30,62}},
+    /* 3R */ {{true,true,true,true,true},     {78,86,80,96,50,95}, {true,true,true,true,true,true},      {74,62,52,74,46,86}}
+};
+
 static int cp_intensity_state(void)
 {
     if(intensity_button<=0)return 0;
     return ((intensity_button-1)*3)+intensity_level+1;
+}
+
+static void cp_apply_intensity_preset(int state)
+{
+    if(state<=0||state>9)return;
+    const cp_intensity_preset_t *p=&intensity_presets[state-1];
+    for(int i=0;i<5;i++){
+        effect_enabled[i]=p->fx_enabled[i];
+        effect_value[i]=p->fx_value[i];
+        prisma_control_set_effect(i,effect_enabled[i]);
+    }
+    effect_enabled[5]=true;
+    effect_value[5]=p->fx_value[5];
+    prisma_control_set_effect(5,true);
+    for(int i=0;i<MOTION_COUNT;i++){
+        motion_enabled[i]=p->motion_enabled[i];
+        motion_value[i]=p->motion_value[i];
+    }
+    ESP_LOGI(SYNC_TAG,"INTENSITY PRESET state=%d mix=%d glitch=%d shake=%d feedback=%d",state,effect_value[5],effect_value[1],motion_value[4],motion_value[5]);
 }
 
 static void cp_select_intensity_button(int button)
@@ -53,7 +95,9 @@ static void cp_select_intensity_button(int button)
         intensity_button=button;
         intensity_level=0;
     }
-    ESP_LOGI(SYNC_TAG,"INTENSITY button=%d level=%d state=%d",intensity_button,intensity_level,cp_intensity_state());
+    int state=cp_intensity_state();
+    cp_apply_intensity_preset(state);
+    ESP_LOGI(SYNC_TAG,"INTENSITY button=%d level=%d state=%d",intensity_button,intensity_level,state);
 }
 
 bool prisma_appliance_get_on(void){return prisma_shared_on;}
