@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 from pathlib import Path
+import ast
+import re
+import subprocess
+import tempfile
 
 root=Path(__file__).resolve().parents[1]
 index=(root/'main/web/index.html').read_text(encoding='utf-8')
@@ -82,6 +86,11 @@ assert "appendLabMirrorBlock(s,fixedRow)" not in portal
 assert "MIX FIXED" in portal
 assert "MIRROR + MIX FIXED" not in portal
 
+# Drag/drop swaps target positions so forward and backward drags are both deterministic.
+assert "var swap=labFxOrder[fromAt]" in portal
+assert "labFxOrder[fromAt]=labFxOrder[toAt]" in portal
+assert "labFxOrder[toAt]=swap" in portal
+
 # REVERSE must not retain the listener from the old fixed-MIRROR pipeline.
 assert "oldReverseButton.cloneNode(true)" in portal
 assert "replaceChild(newReverseButton,oldReverseButton)" in portal
@@ -101,6 +110,20 @@ assert 'processPixelFx' in index and 'processGlitchFx' in index
 assert 'processPosterFx' in index and 'processHueFx' in index and 'processMirrorFx' in index
 assert 'processPixelFx' not in portal and 'processGlitchFx' not in portal
 assert 'processPosterFx' not in portal and 'processHueFx' not in portal and 'processMirrorFx' not in portal
+
+# Reconstruct the injected browser script and validate its JavaScript syntax with Node.
+match=re.search(r'static const char checkpoint_web_injection\[\]\s*=\s*(.*?);\n\nstatic esp_err_t checkpoint_page_get',portal,re.S)
+assert match
+literals=re.findall(r'"(?:\\.|[^"\\])*"',match.group(1))
+assert literals
+injected=''.join(ast.literal_eval(x) for x in literals)
+script_match=re.search(r'<script>(.*?)</script>',injected,re.S)
+assert script_match
+with tempfile.NamedTemporaryFile('w',suffix='.js',encoding='utf-8',delete=False) as tmp:
+    tmp.write(script_match.group(1))
+    js_path=tmp.name
+subprocess.run(['node','--check',js_path],check=True)
+Path(js_path).unlink(missing_ok=True)
 
 # Existing backend/source/admin behavior remains inherited from legacy portal.
 assert '"/source/*"' in legacy_portal
