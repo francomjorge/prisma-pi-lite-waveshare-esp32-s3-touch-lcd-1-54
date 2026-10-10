@@ -21,8 +21,7 @@ static const char intensity_web_injection[] =
 "var oldIntensityBar=document.getElementById('intensityBar');\n"
 "if(oldIntensityBar){\n"
 "  var card=oldIntensityBar.closest('.card');\n"
-"  if(card){card.innerHTML='<div class=\"row compact\"><div class=\"label stronglabel\">INTENSITY</div><div id=\"intensityPresetState\" class=\"intensityPresetState\">FREE</div></div><div id=\"intensityPresetRow\" class=\"intensityPresetRow\" data-control=\"1\"><div id=\"intensityPreset0\" class=\"intensityPresetBtn on free\">0</div><div id=\"intensityPreset1\" class=\"intensityPresetBtn\">1</div><div id=\"intensityPreset2\" class=\"intensityPresetBtn\">2</div><div id=\"intensityPreset3\" class=\"intensityPresetBtn\">3</div></div>';}
-"
+"  if(card){card.innerHTML='<div class=\"row compact\"><div class=\"label stronglabel\">INTENSITY</div><div id=\"intensityPresetState\" class=\"intensityPresetState\">FREE</div></div><div id=\"intensityPresetRow\" class=\"intensityPresetRow\" data-control=\"1\"><div id=\"intensityPreset0\" class=\"intensityPresetBtn on free\">0</div><div id=\"intensityPreset1\" class=\"intensityPresetBtn\">1</div><div id=\"intensityPreset2\" class=\"intensityPresetBtn\">2</div><div id=\"intensityPreset3\" class=\"intensityPresetBtn\">3</div></div>'; }\n"
 "}\n"
 "function decodeIntensityPreset(s){\n"
 "  var state=Math.round(Number(s&&s.intensity));if(!isFinite(state)||state<0)state=0;if(state>9)state=9;\n"
