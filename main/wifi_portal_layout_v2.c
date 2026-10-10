@@ -6,7 +6,7 @@ static esp_err_t layout_v2_page_get(httpd_req_t *r);
 /*
  * Keep the stable intensity/checkpoint wrapper intact.  Intercept only URI
  * registration while it is included so the root page is served by the V2
- * composer.  Other handlers (/api/state, /style.css, /source/*) are passed
+ * composer.  Other handlers (/api/state, /style.css, source routes) are passed
  * through unchanged.
  */
 static esp_err_t layout_v2_register_uri(httpd_handle_t h, const httpd_uri_t *u)
