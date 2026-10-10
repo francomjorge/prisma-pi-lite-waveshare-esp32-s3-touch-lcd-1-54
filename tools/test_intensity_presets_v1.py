@@ -97,8 +97,8 @@ assert "'/api/state?ts='+Date.now()" not in wrapper
 assert '"/api/intensity"' not in wrapper
 assert '"/api/motion"' not in wrapper
 
-# Validate the extra browser JavaScript exactly as served.
-match=re.search(r'static const char intensity_web_injection\[\]\s*=\s*(.*?);\n\nstatic esp_err_t checkpoint_page_get',wrapper,re.S)
+# Validate only the intensity browser JavaScript exactly as served, even when later web-only injections follow it.
+match=re.search(r'static const char intensity_web_injection\[\]\s*=\s*(.*?);\n\n(?:/\*|static const char fxlab_sources_web_injection|static esp_err_t checkpoint_page_get)',wrapper,re.S)
 assert match
 literals=re.findall(r'"(?:\\.|[^"\\])*"',match.group(1))
 assert literals
