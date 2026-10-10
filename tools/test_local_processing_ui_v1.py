@@ -26,7 +26,7 @@ assert '"LOCAL PROCESSING"' in app
 assert '"ACTIVE"' in app and '"INACTIVE"' in app
 assert 'else cp_page_local_processing();' in app
 assert 'page==6' in app
-assert 'local_processing_active=!local_processing_active;' in app
+assert 'local_processing_active=startx<120;' in app
 assert 'local_processing_value[row]=value;' in app
 assert 'value>=0&&value<4' in app
 assert 'prisma_appliance_get_local_processing_active' in app
