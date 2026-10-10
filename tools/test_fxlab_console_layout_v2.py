@@ -21,14 +21,26 @@ assert '.labSourcesPanelV2{grid-column:3' in web
 assert "work.appendChild(labFrame)" in web
 assert "oldPanel.style.display='none'" in web
 
-# Layer ordering is real composition ordering, not DOM-only decoration.
+# Compact technical console: one row per layer, small controls, add button in header.
+assert '.labLayerV2{height:27px;display:grid' in web
+assert 'grid-template-columns:14px 18px minmax(0,1fr) 64px 28px 18px' in web
+assert '.labEyeV2,.labDeleteV2{width:18px;height:18px' in web
+assert 'labAddSourceV2' in web
+assert 'title=\\"Add source\\">+</button>' in web
+assert '+ ADD SOURCE' not in web
+
+# Layer ordering is real composition ordering. Drop upper/lower half means before/after.
 assert 'row.draggable=true' in web
-assert 'function v2Move(fromId,toId)' in web
+assert 'function v2Move(fromId,toId,after)' in web
+assert 'if(after)b++;' in web
+assert 'ev.clientY>rect.top+rect.height/2' in web
+assert "after?'dragAfter':'dragBefore'" in web
 assert "ev.dataTransfer.setData('text/plain',layer.id)" in web
 assert 'for(var i=v2Layers.length-1;i>=0;i--)' in web
 assert "v2Layers.unshift(layer)" in web
+assert "v2Move(from,v2Layers[v2Layers.length-1].id,true)" in web
 
-# LIVE VIEW stays permanent but is reorderable because every row is draggable.
+# LIVE VIEW stays permanent but remains reorderable.
 assert "id:'live'" in web
 assert "name:'LIVE VIEW'" in web
 assert 'removable:false' in web
@@ -85,4 +97,4 @@ with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False, encoding='utf-
     js_path = f.name
 subprocess.run(['node', '--check', js_path], check=True)
 
-print('FX Lab Console Layout V2 protected: 2/3 preview, 1/3 sources, real drag reorder, browser-decoded video')
+print('FX Lab Console Layout V2 protected: compact one-line layers, header add, bidirectional drag reorder')
