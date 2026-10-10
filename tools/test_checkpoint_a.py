@@ -82,9 +82,15 @@ assert "appendLabMirrorBlock(s,fixedRow)" not in portal
 assert "MIX FIXED" in portal
 assert "MIRROR + MIX FIXED" not in portal
 
-# FX Lab visual frame remains present but disappears into the black page background.
-assert '.labFrame{background:#000!important;border-color:#000!important;box-shadow:none!important}' in portal
-assert '.labWaiting{background:#000!important}' in portal
+# REVERSE must not retain the listener from the old fixed-MIRROR pipeline.
+assert "oldReverseButton.cloneNode(true)" in portal
+assert "replaceChild(newReverseButton,oldReverseButton)" in portal
+assert "newReverseButton.addEventListener('click'" in portal
+assert "reverseLabFx();" in portal
+
+# FX Lab visual frame remains present but merges exactly into the page background.
+assert '.labFrame{background:#04070c!important;border-color:#04070c!important;box-shadow:none!important}' in portal
+assert '.labWaiting{background:#04070c!important}' in portal
 assert '.labFrame .labFsBtn{opacity:0!important' in portal
 assert '.labFrame:hover .labFsBtn' in portal
 assert "textContent='FIXED'" not in portal
