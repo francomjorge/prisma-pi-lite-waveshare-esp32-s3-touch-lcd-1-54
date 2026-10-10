@@ -2,7 +2,7 @@
 from pathlib import Path
 
 root=Path(__file__).resolve().parents[1]
-app=(root/'main/app_checkpoint_a.c').read_text(encoding='utf-8')
+app=(root/'main/app_local_processing.c').read_text(encoding='utf-8')
 
 assert 'static void cp_reset_performance(void)' in app
 reset=app.split('static void cp_reset_performance(void)',1)[1].split('bool prisma_appliance_get_on',1)[0]
@@ -22,6 +22,10 @@ assert 'prisma_control_set_effect(5,true);' in reset
 assert 'for(int i=0;i<MOTION_COUNT;i++)' in reset
 assert 'motion_enabled[i]=false;' in reset
 assert 'motion_value[i]=0;' in reset
+
+# Local Processing is a separate subsystem and must survive synth OFF -> ON reset.
+assert 'local_processing_active' not in reset
+assert 'local_processing_value' not in reset
 
 # Reset happens only on OFF -> ON from the appliance power button.
 power_touch=app.split('else if(page==1&&startx>=170&&startx<=232&&starty>=5&&starty<=42)',1)[1].split('else if(page==1&&startx>=12&&startx<=165',1)[0]
@@ -51,4 +55,4 @@ for token in (
 ):
     assert token in app
 
-print('Power-cycle reset V1 protected: OFF->ON resets performance, BYPASS/RANDOM does not, source preserved')
+print('Power-cycle reset V1 protected: synth resets performance only; Local Processing remains independent')
