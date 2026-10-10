@@ -40,9 +40,22 @@ jobs:
           version: "v5.5.1"
 
       - name: Build ESP32-S3 firmware
-        run: idf.py build
+        run: |
+          mkdir -p build
+          set +e
+          idf.py build 2>&1 | tee build/build.log
+          status=${PIPESTATUS[0]}
+          exit $status
         env:
           IDF_TARGET: esp32s3
+
+      - name: Upload ESP-IDF failure log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prisma-pi-build-log
+          if-no-files-found: error
+          path: build/build.log
 
       - name: Upload firmware build
         uses: actions/upload-artifact@v4
