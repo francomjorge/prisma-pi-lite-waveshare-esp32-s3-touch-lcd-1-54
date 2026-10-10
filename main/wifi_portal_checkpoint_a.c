@@ -17,8 +17,13 @@ static const char checkpoint_web_injection[] =
 ".track{width:600%!important}.page{width:16.6666667%!important;flex:0 0 16.6666667%!important}\n"
 ".labFrame{background:#04070c!important;border-color:#04070c!important;box-shadow:none!important}\n"
 ".labWaiting{background:#04070c!important}\n"
-".labFrame .labFsBtn{opacity:0!important;transition:opacity .15s ease,background .15s ease}\n"
-".labFrame:hover .labFsBtn,.labFrame:focus-within .labFsBtn,.labFrame .labFsBtn:focus,.labFrame .labFsBtn:active{opacity:1!important}\n"
+".photo.off{background:#000!important}\n"
+".photo.off .sourcePreview{visibility:hidden!important;opacity:0!important}\n"
+".labFrame.off{background:#000!important}\n"
+".labFrame.off canvas{visibility:hidden!important;opacity:0!important}\n"
+".photo .fsBtn,.labFrame .labFsBtn{opacity:0!important;pointer-events:none!important;transition:opacity .15s ease,background .15s ease}\n"
+".photo:hover .fsBtn,.photo:focus-within .fsBtn,.photo .fsBtn:focus,.photo .fsBtn:active,.labFrame:hover .labFsBtn,.labFrame:focus-within .labFsBtn,.labFrame .labFsBtn:focus,.labFrame .labFsBtn:active{opacity:0!important;pointer-events:none!important}\n"
+".photo.fsControlsVisible .fsBtn,.labFrame.fsControlsVisible .labFsBtn{opacity:1!important;pointer-events:auto!important}\n"
 ".labOrderRow .labBlock[data-fx=\"0\"],.labOrderRow .labBlock[data-fx=\"1\"],.labOrderRow .labBlock[data-fx=\"2\"],.labOrderRow .labBlock[data-fx=\"3\"],.labOrderRow .labBlock[data-fx=\"4\"],.labFixedRow .labBlock[data-fx=\"5\"]{border-color:#af37ff!important}\n"
 ".labOrderRow .labBlock[data-fx=\"6\"],.labOrderRow .labBlock[data-fx=\"7\"],.labOrderRow .labBlock[data-fx=\"8\"],.labOrderRow .labBlock[data-fx=\"9\"],.labOrderRow .labBlock[data-fx=\"10\"],.labOrderRow .labBlock[data-fx=\"11\"]{border-color:#ff7819!important}\n"
 "</style>\n"
@@ -33,6 +38,17 @@ static const char checkpoint_web_injection[] =
 "  var dots=document.querySelector('.dots');if(dots&&!document.getElementById('d5')){var d=document.createElement('i');d.id='d5';d.className='dot';dots.appendChild(d);}\n"
 "}\n"
 "page=function(n){pg=Math.max(0,Math.min(5,n));t.style.transform='translateX(-'+(pg*(100/6))+'%)';for(var i=0;i<6;i++){var d=document.getElementById('d'+i);if(d)d.className='dot'+(i===pg?' on':'');}if(pg===4)renderLabPreview();};\n"
+"\n"
+"function bindFsActivity(frame){\n"
+"  if(!frame)return;var timer=0;\n"
+"  function hide(){frame.classList.remove('fsControlsVisible');}\n"
+"  function show(){frame.classList.add('fsControlsVisible');clearTimeout(timer);timer=setTimeout(hide,1100);}\n"
+"  frame.addEventListener('pointermove',show,{passive:true});\n"
+"  frame.addEventListener('mousemove',show,{passive:true});\n"
+"  frame.addEventListener('touchstart',show,{passive:true});\n"
+"  frame.addEventListener('pointerleave',hide,{passive:true});\n"
+"}\n"
+"bindFsActivity(fsFrame);bindFsActivity(labFrame);\n"
 "\n"
 "labFxNames=['PIXEL','GLITCH','POSTER','HUE','MIRROR','MIX','PULSE','DRIFT','ROTATE','WAVE','SHAKE','FEEDBACK'];\n"
 "normalizeLabOrder=function(order){var allowed=[0,1,2,3,4,6,7,8,9,10,11],seen={},out=[];if(Array.isArray(order)){for(var i=0;i<order.length;i++){var fx=Number(order[i]);if(allowed.indexOf(fx)>=0&&!seen[fx]){seen[fx]=true;out.push(fx);}}}for(var j=0;j<allowed.length;j++){var id=allowed[j];if(!seen[id])out.push(id);}out.push(5);return out;};\n"
@@ -126,6 +142,8 @@ static const char checkpoint_web_injection[] =
 "\n"
 "runFxPipeline=function(s){\n"
 "  var src=fxEngine.buffers.a,dst=fxEngine.buffers.b,mixGain=fxEngine.mixGain(labEffectValue(s,5)),time=motionFrameTime||performance.now();\n"
+"  if(!s||!s.on){motionFeedbackValid=false;motionCtx(dst);return dst;}\n"
+"  if(s.mode){motionFeedbackValid=false;return src;}\n"
 "  for(var i=0;i<labFxOrder.length;i++){\n"
 "    var fx=labFxOrder[i];if(fx===5||!labEffectEnabled(s,fx))continue;\n"
 "    var node=fx<=4?fxEngine.registry[fx]:motionRegistry[fx];if(!node||typeof node.process!=='function')continue;\n"
@@ -135,7 +153,7 @@ static const char checkpoint_web_injection[] =
 "  return src;\n"
 "};\n"
 "\n"
-"function anyMotionActive(s){var me=s&&Array.isArray(s.motionEffects)?s.motionEffects:[];for(var i=0;i<6;i++)if(me[i])return true;return false;}\n"
+"function anyMotionActive(s){if(!s||!s.on||s.mode)return false;var me=s&&Array.isArray(s.motionEffects)?s.motionEffects:[];for(var i=0;i<6;i++)if(me[i])return true;return false;}\n"
 "function labIsVisible(){return pg===4||realFsElement()===labFrame||labFrame.classList.contains('pseudoFull');}\n"
 "function motionTick(ts){motionFrameTime=ts;if(anyMotionActive(latestState)&&labIsVisible()&&ts-motionLastPaint>=33){motionLastPaint=ts;renderLabPreview();}requestAnimationFrame(motionTick);}\n"
 "requestAnimationFrame(motionTick);\n"
@@ -163,7 +181,7 @@ static esp_err_t checkpoint_state_get(httpd_req_t*r)
     bool on=prisma_appliance_get_on();int mode=prisma_appliance_get_mode()?1:0;int intensity=prisma_appliance_get_intensity();const char *filename=prisma_appliance_get_filename();bool effects[6],motion[6];int values[6],motion_values[6];if(!filename||!*filename)filename="F1_MOON.JPG";
     for(int i=0;i<6;i++){effects[i]=prisma_appliance_get_effect(i);values[i]=prisma_appliance_get_effect_value(i);motion[i]=prisma_appliance_get_motion_effect(i);motion_values[i]=prisma_appliance_get_motion_value(i);}effects[5]=true;
     bool changed=!have_last||last_on!=on||last_mode!=mode||last_intensity!=intensity||strcmp(last_filename,filename)!=0;for(int i=0;i<6;i++)if(last_effects[i]!=effects[i]||last_values[i]!=values[i]||last_motion[i]!=motion[i]||last_motion_values[i]!=motion_values[i])changed=true;
-    if(changed){generation++;if(generation<=0)generation=1;last_on=on;last_mode=mode;last_intensity=intensity;strlcpy(last_filename,filename,sizeof(last_filename));for(int i=0;i<6;i++){last_effects[i]=effects[i];last_values[i]=values[i];last_motion[i]=motion[i];last_motion_values[i]=motion_values[i];}have_last=true;ESP_LOGI(TAG,"WEB STATE gen=%d source=%s motion-sync",generation,filename);}
+    if(changed){generation++;if(generation<=0)generation=1;last_on=on;last_mode=mode;last_intensity=intensity;strlcpy(last_filename,filename,sizeof(last_filename));for(int i=0;i<6;i++){last_effects[i]=effects[i];last_values[i]=values[i];last_motion[i]=motion[i];last_motion_values[i]=motion_values[i];}have_last=true;ESP_LOGI(TAG,"WEB STATE gen=%d source=%s master-sync",generation,filename);}
     char b[1024];int n=snprintf(b,sizeof(b),"{\"on\":%s,\"mode\":%d,\"intensity\":%d,\"generation\":%d,\"filename\":\"%s\",\"effects\":[%s,%s,%s,%s,%s,true],\"values\":[%d,%d,%d,%d,%d,%d],\"motionEffects\":[%s,%s,%s,%s,%s,%s],\"motionValues\":[%d,%d,%d,%d,%d,%d]}",on?"true":"false",mode,intensity,generation,filename,effects[0]?"true":"false",effects[1]?"true":"false",effects[2]?"true":"false",effects[3]?"true":"false",effects[4]?"true":"false",values[0],values[1],values[2],values[3],values[4],values[5],motion[0]?"true":"false",motion[1]?"true":"false",motion[2]?"true":"false",motion[3]?"true":"false",motion[4]?"true":"false",motion[5]?"true":"false",motion_values[0],motion_values[1],motion_values[2],motion_values[3],motion_values[4],motion_values[5]);
     if(n<0||n>=(int)sizeof(b)){httpd_resp_send_err(r,HTTPD_500_INTERNAL_SERVER_ERROR,"state overflow");return ESP_FAIL;}httpd_resp_set_type(r,"application/json");no_cache(r);return httpd_resp_send(r,b,n);
 }
@@ -171,7 +189,7 @@ static esp_err_t checkpoint_state_get(httpd_req_t*r)
 static void checkpoint_start_portal(void)
 {
     uint8_t mac[6];esp_read_mac(mac,ESP_MAC_WIFI_SOFTAP);char ap[32];snprintf(ap,sizeof(ap),"PRISMA-PI-%02X%02X",mac[4],mac[5]);wifi_config_t cfg={0};strlcpy((char*)cfg.ap.ssid,ap,sizeof(cfg.ap.ssid));cfg.ap.ssid_len=strlen(ap);cfg.ap.max_connection=4;cfg.ap.authmode=WIFI_AUTH_OPEN;ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP,&cfg));ESP_ERROR_CHECK(esp_wifi_start());
-    httpd_config_t hc=HTTPD_DEFAULT_CONFIG();hc.uri_match_fn=httpd_uri_match_wildcard;hc.lru_purge_enable=true;hc.max_uri_handlers=16;httpd_handle_t h=NULL;if(httpd_start(&h,&hc)==ESP_OK){httpd_uri_t a={.uri="/",.method=HTTP_GET,.handler=checkpoint_page_get};httpd_uri_t b={.uri="/api/state",.method=HTTP_GET,.handler=checkpoint_state_get};httpd_uri_t c={.uri="/style.css",.method=HTTP_GET,.handler=css_get};httpd_uri_t d={.uri="/source/*",.method=HTTP_GET,.handler=source_get};httpd_register_uri_handler(h,&a);httpd_register_uri_handler(h,&b);httpd_register_uri_handler(h,&c);httpd_register_uri_handler(h,&d);prisma_admin_register(h);}ESP_LOGI(TAG,"PRISMA LITE MOTION V1: %s - http://192.168.4.1",ap);
+    httpd_config_t hc=HTTPD_DEFAULT_CONFIG();hc.uri_match_fn=httpd_uri_match_wildcard;hc.lru_purge_enable=true;hc.max_uri_handlers=16;httpd_handle_t h=NULL;if(httpd_start(&h,&hc)==ESP_OK){httpd_uri_t a={.uri="/",.method=HTTP_GET,.handler=checkpoint_page_get};httpd_uri_t b={.uri="/api/state",.method=HTTP_GET,.handler=checkpoint_state_get};httpd_uri_t c={.uri="/style.css",.method=HTTP_GET,.handler=css_get};httpd_uri_t d={.uri="/source/*",.method=HTTP_GET,.handler=source_get};httpd_register_uri_handler(h,&a);httpd_register_uri_handler(h,&b);httpd_register_uri_handler(h,&c);httpd_register_uri_handler(h,&d);prisma_admin_register(h);}ESP_LOGI(TAG,"PRISMA LITE MASTER BEHAVIOR V1: %s - http://192.168.4.1",ap);
 }
 
 void prisma_wifi_start(void)
