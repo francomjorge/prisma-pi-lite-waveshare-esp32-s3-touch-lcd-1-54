@@ -40,14 +40,14 @@ assert 'prisma_control_set_filename(src);' in app
 assert 'prisma_storage_next()' not in reset
 assert 'prisma_control_set_filename' not in reset
 
-# Pixel-tuned preset table from the parent branch must remain intact.
+# Low-destruction preset table from the parent work must remain intact.
 for token in (
     '/* 1G */ {{false,false,false,true,false}, { 0, 6,15,12,50,45}',
-    '/* 2Y */ {{true,true,true,true,false},    {22,33,42,52,50,62}',
-    '/* 2R */ {{true,true,true,true,true},     {25,43,50,64,50,68}',
+    '/* 2Y */ {{false,true,true,true,false},   { 0,33,42,52,50,62}',
+    '/* 2R */ {{true,true,true,true,true},     { 8,43,50,64,50,68}',
     '/* 3G */ {{false,true,true,true,true},    { 0,54,58,74,50,75}',
-    '/* 3Y */ {{true,true,true,true,true},     {53,68,68,85,50,84}',
-    '/* 3R */ {{true,true,true,true,true},     {62,86,80,96,50,95}',
+    '/* 3Y */ {{false,true,true,true,true},    { 0,68,68,85,50,84}',
+    '/* 3R */ {{false,true,true,true,true},    { 0,86,80,96,50,95}',
 ):
     assert token in app
 
