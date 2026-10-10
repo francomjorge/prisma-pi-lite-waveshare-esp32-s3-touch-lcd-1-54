@@ -3,7 +3,7 @@ name: ESP-IDF build
 
 on:
   push:
-    branches: [main, m4.3-consolidated, m4.3-web4-readonly, m4.4-page2-bidirectional, m4.5-unified-build58-sync, m4.6-page2-build58-readonly, m4.7-page2-direct-readonly, m4.8-sync-lab, m4.9-global-web-sync, m4.10-clean-assets, m4.11-correct-assets-ci, m4.11-controller-stable, v5.0-no-effect-no-admin, v1.0-stable-power, v1.0-web-keyboard-nav, v1.0-liveview-rotate-key, v1.1-admin-readonly, v1.1-admin-official-telemetry, v0-fxlab-page5, v0-fxlab-rotate, v0-fxengine-infra, v0-fxengine-pixel-v1, v0-fxengine-glitch-v1-fullscreen, v0-fxengine-allfx-v1, v0-checkpoint-a-six-pages-motion, v0-fxlab-unified-pipeline-v1, v0-motionfx-v1-all, v0-master-behavior-v1, v0-intensity-presets-ui-v1, v0-intensity-presets-v2, v0-intensity-presets-v2-pixel-tune, v0-powercycle-reset-v1]
+    branches: [main, m4.3-consolidated, m4.3-web4-readonly, m4.4-page2-bidirectional, m4.5-unified-build58-sync, m4.6-page2-build58-readonly, m4.7-page2-direct-readonly, m4.8-sync-lab, m4.9-global-web-sync, m4.10-clean-assets, m4.11-correct-assets-ci, m4.11-controller-stable, v5.0-no-effect-no-admin, v1.0-stable-power, v1.0-web-keyboard-nav, v1.0-liveview-rotate-key, v1.1-admin-readonly, v1.1-admin-official-telemetry, v0-fxlab-page5, v0-fxlab-rotate, v0-fxengine-infra, v0-fxengine-pixel-v1, v0-fxengine-glitch-v1-fullscreen, v0-fxengine-allfx-v1, v0-checkpoint-a-six-pages-motion, v0-fxlab-unified-pipeline-v1, v0-motionfx-v1-all, v0-master-behavior-v1, v0-intensity-presets-ui-v1, v0-intensity-presets-v2, v0-intensity-presets-v2-pixel-tune, v0-powercycle-reset-v1, v0-presets-granularity-admin-auth-v1]
   workflow_dispatch:
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
       - name: Validate master behavior V1
         run: python3 tools/test_master_behavior_v1.py
 
-      - name: Validate intensity presets V2
+      - name: Validate intensity presets V3
         run: python3 tools/test_intensity_presets_v1.py
 
       - name: Validate power-cycle reset V1
@@ -27,6 +27,9 @@ jobs:
 
       - name: Validate read-only admin
         run: python3 tools/test_admin_readonly.py
+
+      - name: Validate admin auth V1
+        run: python3 tools/test_admin_auth_v1.py
 
       - name: Install ESP-IDF v5.5.1
         uses: espressif/install-esp-idf-action@v1
