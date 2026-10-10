@@ -100,6 +100,27 @@ static void cp_select_intensity_button(int button)
     ESP_LOGI(SYNC_TAG,"INTENSITY button=%d level=%d state=%d",intensity_button,intensity_level,state);
 }
 
+static void cp_reset_performance(void)
+{
+    prisma_shared_mode=1;
+    prisma_shared_intensity=0;
+    intensity_button=0;
+    intensity_level=0;
+    for(int i=0;i<5;i++){
+        effect_enabled[i]=false;
+        effect_value[i]=0;
+        prisma_control_set_effect(i,false);
+    }
+    effect_enabled[5]=true;
+    effect_value[5]=0;
+    prisma_control_set_effect(5,true);
+    for(int i=0;i<MOTION_COUNT;i++){
+        motion_enabled[i]=false;
+        motion_value[i]=0;
+    }
+    ESP_LOGI(SYNC_TAG,"PERFORMANCE RESET -> BYPASS intensity=0 static=OFF/0 motion=OFF/0 mix=0");
+}
+
 bool prisma_appliance_get_on(void){return prisma_shared_on;}
 int prisma_appliance_get_mode(void){return prisma_shared_mode ? 1 : 0;}
 int prisma_appliance_get_intensity(void){return cp_intensity_state();}
@@ -211,7 +232,7 @@ void app_main(void)
         else if(touched){miss=0;if(!down){startx=x;starty=y;down=true;}else if((int)startx-(int)x>55&&page<CP_PAGE_COUNT-1){page++;glitch_count=0;cp_draw_page(page,phase);down=false;if(cp_page_needs_input_debounce(page)){input_lock=true;input_lock_ticks=CONTROL_DEBOUNCE_TICKS;}}else if((int)x-(int)startx>55&&page>0){page--;glitch_count=0;if(page==0)home_cooldown=HOME_COOLDOWN_TICKS;cp_draw_page(page,phase);down=false;if(cp_page_needs_input_debounce(page)){input_lock=true;input_lock_ticks=CONTROL_DEBOUNCE_TICKS;}}}
         else if(down&&++miss>4){
             if(page==0&&home_cooldown==0)glitch(startx,starty);
-            else if(page==1&&startx>=170&&startx<=232&&starty>=5&&starty<=42){toggle_power();cp_draw_page(1,phase);}
+            else if(page==1&&startx>=170&&startx<=232&&starty>=5&&starty<=42){bool was_on=prisma_shared_on;toggle_power();if(!was_on&&prisma_shared_on)cp_reset_performance();cp_draw_page(1,phase);}
             else if(page==1&&startx>=12&&startx<=165&&starty>=45&&starty<=85){const char *src=prisma_storage_next();prisma_control_set_filename(src);cp_draw_page(1,phase);ESP_LOGI(SYNC_TAG,"SOURCE -> %s",src);}
             else if(page==1&&starty>=INTENSITY_BUTTON_Y-4&&starty<=INTENSITY_BUTTON_Y+INTENSITY_BUTTON_H+4&&startx>=INTENSITY_BUTTON_X&&startx<=228){int rel=(int)startx-INTENSITY_BUTTON_X;int stride=INTENSITY_BUTTON_W+INTENSITY_BUTTON_GAP;int button=rel/stride;int inside=rel%stride;if(button>=0&&button<4&&inside<INTENSITY_BUTTON_W){cp_select_intensity_button(button);cp_draw_page(1,phase);}}
             else if(page==1&&prisma_shared_on&&startx>=82&&startx<=232&&starty>=139&&starty<=181){prisma_shared_mode=prisma_shared_mode?0:1;cp_draw_page(1,phase);}
