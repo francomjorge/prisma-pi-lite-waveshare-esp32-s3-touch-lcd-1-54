@@ -25,6 +25,9 @@ assert '"FX LAB"' in app and '"OPEN IN BROWSER"' in app
 assert 'cp_page_motion' in app
 assert 'page==4' in app and 'page==5' in app
 assert 'page==1||page==3||page==5' in app
+assert 'cp_page_intro' in app and 'cp_page_controls' in app and 'cp_page_monitor' in app and 'cp_page_effects' in app
+assert 'page_intro(phase);cp_finish_page' not in app
+assert 'page_controls();cp_finish_page' not in app
 
 # Six independent motion controls: no MIX and no browser animation processing yet.
 for name in ('PULSE','DRIFT','ROTATE','WAVE','SHAKE','FEEDBACK'):

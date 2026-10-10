@@ -44,10 +44,35 @@ static void cp_dots(int page, uint16_t cyan, uint16_t dim)
     for(int i=0;i<CP_PAGE_COUNT;i++) rect(xs[i],224,8,8,i==page?cyan:dim);
 }
 
-static void cp_finish_page(int page, bool enabled)
+static void cp_page_intro(int phase)
 {
-    uint16_t cy=rgb(35,220,220),dim=rgb(45,60,75),disabled=rgb(75,82,90);
-    cp_dots(page,enabled?cy:disabled,dim);show();
+    uint16_t bg=rgb(4,7,12),wh=rgb(240,245,250),cy=rgb(35,220,220),dim=rgb(45,60,75);
+    clear(bg);logo_title(42,phase);text_center(100,"LITE",3,wh);text_center(151,"VIDEO SYNTHESIZER",2,wh);cp_dots(0,cy,dim);show();
+}
+
+static void cp_page_controls(void)
+{
+    uint16_t bg=rgb(4,7,12),wh=rgb(240,245,250),cy=rgb(35,220,220),dim=rgb(45,60,75),disabled=rgb(75,82,90),blue=rgb(25,65,145),green=rgb(35,200,110),red=rgb(230,55,65);
+    uint16_t fg=prisma_shared_on?wh:disabled,accent=prisma_shared_on?cy:disabled;clear(bg);
+    text(12,10,"PRISMA-PI",2,wh);rect(174,7,54,28,prisma_shared_on?green:red);text_box_center(174,54,14,prisma_shared_on?"ON":"OFF",2,wh);text(12,47,"NOW PLAYING",1,accent);text(12,60,prisma_storage_current(),2,fg);text(12,91,"INTENSITY",2,fg);
+    char pct[8];snprintf(pct,sizeof(pct),"%d",prisma_shared_intensity);text(198,91,pct,2,fg);rect(12,114,216,10,dim);rect(12,114,prisma_shared_on?(216*prisma_shared_intensity/100):0,10,accent);text(12,151,"MODE",2,fg);rect(86,143,142,34,prisma_shared_on?blue:dim);text_box_center(86,142,154,prisma_shared_mode?"BYPASS":"RANDOM",2,fg);cp_dots(1,prisma_shared_on?cy:disabled,dim);show();
+}
+
+static void cp_page_monitor(void)
+{
+    uint16_t bg=rgb(4,7,12),wh=rgb(240,245,250),cy=rgb(35,220,220),dim=rgb(45,60,75);
+    clear(bg);text_center(48,"VISUAL MONITOR",2,wh);rect(28,82,184,2,cy);text_center(106,"OPEN IN BROWSER",2,wh);text_center(143,"192.168.4.1",2,cy);cp_dots(2,cy,dim);show();
+}
+
+static void cp_page_effects(void)
+{
+    uint16_t bg=rgb(4,7,12),wh=rgb(240,245,250),cy=rgb(35,220,220),dim=rgb(45,60,75),disabled=rgb(75,82,90),green=rgb(35,200,110),red=rgb(230,55,65);clear(bg);
+    for(int i=0;i<EFFECT_COUNT;i++){
+        int y=FX_ROW_Y+i*FX_ROW_STEP;bool enabled=(i==5)?true:effect_enabled[i];uint16_t label=!prisma_shared_on?disabled:(enabled?wh:dim);text(FX_LABEL_X,y,effect_names[i],FX_TEXT_SCALE,label);
+        if(i==4){int sy=y-2;rect(FX_BAR_X,sy,48,20,enabled?(prisma_shared_on?green:disabled):dim);text_box_center(FX_BAR_X,48,sy+7,"ON",1,wh);rect(FX_BAR_X+54,sy,48,20,!enabled?(prisma_shared_on?red:disabled):dim);text_box_center(FX_BAR_X+54,48,sy+7,"OFF",1,wh);}
+        else{char value[4];snprintf(value,sizeof(value),"%d",effect_value[i]);rect(FX_BAR_X,y+3,FX_BAR_W,8,dim);int fill=FX_BAR_W*effect_value[i]/100;if(fill>0)rect(FX_BAR_X,y+3,fill,8,(prisma_shared_on&&enabled)?cy:disabled);text(FX_VALUE_X,y+3,value,1,label);}
+    }
+    cp_dots(3,prisma_shared_on?cy:disabled,dim);show();
 }
 
 static void cp_page_fx_lab(void)
@@ -73,10 +98,10 @@ static void cp_page_motion(void)
 
 static void cp_draw_page(int page,int phase)
 {
-    if(page==0){page_intro(phase);cp_finish_page(0,true);}
-    else if(page==1){page_controls();cp_finish_page(1,prisma_shared_on);}
-    else if(page==2){page_monitor();cp_finish_page(2,true);}
-    else if(page==3){page_effects();cp_finish_page(3,prisma_shared_on);}
+    if(page==0)cp_page_intro(phase);
+    else if(page==1)cp_page_controls();
+    else if(page==2)cp_page_monitor();
+    else if(page==3)cp_page_effects();
     else if(page==4)cp_page_fx_lab();
     else cp_page_motion();
 }
