@@ -11,10 +11,16 @@ cmake=(root/'main/CMakeLists.txt').read_text(encoding='utf-8')
 app=(root/'main/app_checkpoint_a.c').read_text(encoding='utf-8')
 portal=(root/'main/wifi_portal_checkpoint_a.c').read_text(encoding='utf-8')
 intensity_portal=(root/'main/wifi_portal_intensity.c').read_text(encoding='utf-8')
+layout_path=root/'main/wifi_portal_layout_v2.c'
+layout_portal=layout_path.read_text(encoding='utf-8') if layout_path.exists() else ''
 legacy_portal=(root/'main/wifi_portal.c').read_text(encoding='utf-8')
 
-# Physical appliance remains the six-page checkpoint, with the intensity UI layered on page 2.
-assert '"app_checkpoint_a.c"' in cmake and '"wifi_portal_intensity.c"' in cmake
+# Physical appliance remains the six-page checkpoint. Web wrappers may be layered above intensity.
+assert '"app_checkpoint_a.c"' in cmake
+if '"wifi_portal_layout_v2.c"' in cmake:
+    assert '#include "wifi_portal_intensity.c"' in layout_portal
+else:
+    assert '"wifi_portal_intensity.c"' in cmake
 assert '"wifi_portal_checkpoint_a.c"' not in cmake.split('SRCS',1)[1].split('INCLUDE_DIRS',1)[0]
 assert '#include "main.c"' in app and '#include "wifi_portal.c"' in portal
 assert '#include "wifi_portal_checkpoint_a.c"' in intensity_portal
@@ -100,4 +106,4 @@ with tempfile.NamedTemporaryFile('w',suffix='.js',encoding='utf-8',delete=False)
 subprocess.run(['node','--check',js_path],check=True)
 Path(js_path).unlink(missing_ok=True)
 
-print('Checkpoint protected: six pages, unified FX/Motion pipeline, master behavior and intensity wrapper layering')
+print('Checkpoint protected: six pages, unified FX/Motion pipeline, master behavior and web wrapper layering')
