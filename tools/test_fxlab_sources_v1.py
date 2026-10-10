@@ -52,10 +52,15 @@ assert 'drawContain(ctx,layer.media,w,h)' in web
 assert 'SPIFFS' in web  # comment explicitly states files are not written there
 assert 'nvs_set' not in web
 
-# Reconstruct the adjacent C string literals and syntax-check the injected JS.
-block = web.split('static const char fxlab_sources_web_injection[] =', 1)[1]
+# Reconstruct only the V1 source injection, not string literals in later handlers.
+match = re.search(
+    r'static const char fxlab_sources_web_injection\[\]\s*=\s*(.*?);\n\nstatic esp_err_t (?:checkpoint_page_get|PRISMA_INTENSITY_PAGE_GET)',
+    web,
+    re.S,
+)
+assert match
 parts = []
-for line in block.splitlines():
+for line in match.group(1).splitlines():
     line = line.strip()
     if line.startswith('"'):
         if line.endswith(';'):
