@@ -48,15 +48,15 @@ typedef struct {
  * States 1..9 map to 1G,1Y,1R,2G,2Y,2R,3G,3Y,3R.
  */
 static const cp_intensity_preset_t intensity_presets[9] = {
-    /* 1G */ {{false,false,false,true,false}, { 0, 6,15,12,50,45}, {true,false,false,false,false,false}, {12, 6, 4, 5, 0, 5}},
-    /* 1Y */ {{false,false,true,true,false},  { 0,10,22,20,50,48}, {true,true,false,false,false,false},  {18,10, 5, 8, 0, 8}},
-    /* 1R */ {{false,true,true,true,false},   { 0,16,28,30,50,52}, {true,true,false,true,false,false},   {24,14, 6,12, 0,10}},
-    /* 2G */ {{false,true,true,true,false},   { 0,24,34,40,50,56}, {true,true,false,true,true,false},    {30,20,10,18, 7,14}},
-    /* 2Y */ {{true,true,true,true,false},    {22,33,42,52,50,62}, {true,true,true,true,true,false},     {36,26,14,25,10,20}},
-    /* 2R */ {{true,true,true,true,true},     {25,43,50,64,50,68}, {true,true,true,true,true,true},      {43,32,20,32,14,28}},
-    /* 3G */ {{false,true,true,true,true},    { 0,54,58,74,50,75}, {true,true,true,true,true,true},      {50,38,28,42,20,38}},
-    /* 3Y */ {{true,true,true,true,true},     {53,68,68,85,50,84}, {true,true,true,true,true,true},      {60,48,38,56,30,62}},
-    /* 3R */ {{true,true,true,true,true},     {62,86,80,96,50,95}, {true,true,true,true,true,true},      {74,62,52,74,46,86}}
+    /* 1G */ {{false,false,false,true,false}, { 0, 6,15,12,50,45}, {true,false,false,false,false,false}, {12, 6, 0, 5, 0, 5}},
+    /* 1Y */ {{false,false,true,true,false},  { 0,10,22,20,50,48}, {true,true,false,false,false,false},  {18,10, 0, 8, 0, 8}},
+    /* 1R */ {{false,true,true,true,false},   { 0,16,28,30,50,52}, {true,true,false,true,false,false},   {24,14, 0,12, 0,10}},
+    /* 2G */ {{false,true,true,true,false},   { 0,24,34,40,50,56}, {true,true,false,true,true,false},    {30,20, 0,18, 7,14}},
+    /* 2Y */ {{false,true,true,true,false},   { 0,33,42,52,50,62}, {true,true,false,true,true,false},    {36,26, 0,25,10,20}},
+    /* 2R */ {{true,true,true,true,true},     { 8,43,50,64,50,68}, {true,true,false,true,true,true},     {43,32, 0,32,14,28}},
+    /* 3G */ {{false,true,true,true,true},    { 0,54,58,74,50,75}, {true,true,false,true,true,true},     {50,38, 0,42,20,38}},
+    /* 3Y */ {{false,true,true,true,true},    { 0,68,68,85,50,84}, {true,true,false,true,true,true},     {60,48, 0,56,30,62}},
+    /* 3R */ {{false,true,true,true,true},    { 0,86,80,96,50,95}, {true,true,false,true,true,true},     {74,62, 0,74,46,86}}
 };
 
 static int cp_intensity_state(void)
