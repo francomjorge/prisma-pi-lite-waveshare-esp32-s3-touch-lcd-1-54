@@ -1,11 +1,27 @@
 #include "esp_http_server.h"
 #include <string.h>
 
-static esp_err_t checkpoint_page_get(httpd_req_t *r);
+static esp_err_t layout_v2_page_get(httpd_req_t *r);
 
-#define checkpoint_page_get(...) layout_v2_base_page_get(__VA_ARGS__)
+/*
+ * Keep the stable intensity/checkpoint wrapper intact.  Intercept only URI
+ * registration while it is included so the root page is served by the V2
+ * composer.  Other handlers (/api/state, /style.css, /source/*) are passed
+ * through unchanged.
+ */
+static esp_err_t layout_v2_register_uri(httpd_handle_t h, const httpd_uri_t *u)
+{
+    if (u && u->uri && strcmp(u->uri, "/") == 0 && u->method == HTTP_GET) {
+        httpd_uri_t copy = *u;
+        copy.handler = layout_v2_page_get;
+        return httpd_register_uri_handler(h, &copy);
+    }
+    return httpd_register_uri_handler(h, u);
+}
+
+#define httpd_register_uri_handler(...) layout_v2_register_uri(__VA_ARGS__)
 #include "wifi_portal_intensity.c"
-#undef checkpoint_page_get
+#undef httpd_register_uri_handler
 
 /*
  * FX Lab Console Layout V2.
@@ -52,9 +68,8 @@ static const char fxlab_layout_v2_injection[] =
 "v2RenderList();v2Paint();\n"
 "})();</script>\n";
 
-static esp_err_t checkpoint_page_get(httpd_req_t *r)
+static esp_err_t layout_v2_page_get(httpd_req_t *r)
 {
-    (void)layout_v2_base_page_get;
     const char needle[]="</body>";
     const uint8_t *s=web_index_html_start,*e=web_index_html_end,*cut=NULL;
     size_t len=(size_t)(e-s),nlen=sizeof(needle)-1;
