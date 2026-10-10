@@ -61,7 +61,7 @@ static const char local_processing_web_injection[] =
 
 static esp_err_t local_httpd_resp_send_proxy(httpd_req_t *r,const char *buf,ssize_t len)
 {
-    if(r&&r->uri&&strcmp(r->uri,"/api/state")==0&&buf){
+    if(r&&strcmp(r->uri,"/api/state")==0&&buf){
         size_t n=(len==HTTPD_RESP_USE_STRLEN)?strlen(buf):(len>0?(size_t)len:0);
         size_t cut=n;while(cut>0&&(buf[cut-1]==' '||buf[cut-1]=='\n'||buf[cut-1]=='\r'||buf[cut-1]=='\t'))cut--;
         if(cut>0&&buf[cut-1]=='}'&&cut<1200){
@@ -75,7 +75,7 @@ static esp_err_t local_httpd_resp_send_proxy(httpd_req_t *r,const char *buf,ssiz
 
 static esp_err_t local_httpd_resp_send_chunk_proxy(httpd_req_t *r,const char *buf,ssize_t len)
 {
-    if(r&&r->uri&&strcmp(r->uri,"/")==0&&buf){
+    if(r&&strcmp(r->uri,"/")==0&&buf){
         size_t n=(len==HTTPD_RESP_USE_STRLEN)?strlen(buf):(len>0?(size_t)len:0);
         if(n>=7&&memcmp(buf,"</body>",7)==0){esp_err_t e=httpd_resp_send_chunk(r,local_processing_web_injection,HTTPD_RESP_USE_STRLEN);if(e!=ESP_OK)return e;}
     }
