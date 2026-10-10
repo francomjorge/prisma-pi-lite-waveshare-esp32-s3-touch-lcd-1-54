@@ -32,6 +32,13 @@ static const char intensity_web_injection[] =
 "  for(var i=0;i<4;i++){var b=document.getElementById('intensityPreset'+i);if(!b)continue;b.className='intensityPresetBtn';if(i===d.button)b.className+=' on '+(i===0?'free':classes[d.level]);}\n"
 "}\n"
 "var intensityOldDrawAll=drawAll;drawAll=function(s){intensityOldDrawAll(s);drawIntensityPreset(s);};\n"
+"var intensityOldRunFxPipeline=runFxPipeline;runFxPipeline=function(s){\n"
+"  if(!s||!Array.isArray(s.motionValues))return intensityOldRunFxPipeline(s);\n"
+"  var mapped={},k;for(k in s){if(Object.prototype.hasOwnProperty.call(s,k))mapped[k]=s[k];}\n"
+"  mapped.motionValues=s.motionValues.slice();\n"
+"  for(var i=0;i<mapped.motionValues.length;i++){var x=Math.max(0,Math.min(100,Number(mapped.motionValues[i])||0))/100;mapped.motionValues[i]=Math.pow(x,1.8)*100;}\n"
+"  return intensityOldRunFxPipeline(mapped);\n"
+"};\n"
 "if(latestState)drawIntensityPreset(latestState);\n"
 "})();</script>\n";
 
