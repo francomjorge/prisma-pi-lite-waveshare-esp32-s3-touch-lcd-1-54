@@ -29,6 +29,36 @@ assert 'labAddSourceV2' in web
 assert 'title=\\"Add source\\">+</button>' in web
 assert '+ ADD SOURCE' not in web
 
+# Clean web titles and reduced explanatory clutter.
+assert "setPageTitle(pages[1],'PRISMA PiCore')" in web
+assert "setPageTitle(pages[2],'IMAGEN')" in web
+assert "setPageTitle(pages[3],'EFFECTS')" in web
+assert "fxTitle.textContent='FX LAB'" in web
+assert "motionTitle.textContent='MOTION'" in web
+assert 'if(fxSub)fxSub.remove()' in web
+assert 'if(pipeSub)pipeSub.remove()' in web
+assert 'if(motionSub)motionSub.remove()' in web
+
+# LIVE source display name is now APPLIANCE IMAGEN, while the internal id stays stable.
+assert "id:'live'" in web
+assert "name:'APPLIANCE IMAGEN'" in web
+assert "layer.type==='live'?'APPLIANCE IMAGEN':'LOCAL VIDEO'" in web
+assert 'removable:false' in web
+
+# Active FX pipeline is visually compact without changing processing semantics.
+assert '.labPipeline{gap:4px!important;margin-top:5px!important;min-height:28px!important}' in web
+assert '.labBlock{gap:4px!important;border-radius:8px!important;padding:4px 5px!important;min-height:27px!important}' in web
+assert '.labMove{width:18px!important;height:18px!important' in web
+assert '.labBlockName{font-size:9px!important' in web
+assert '.labReverse{padding:5px 7px!important;font-size:8px!important' in web
+
+# Page and Sources scrollbars stay hidden until hover; if no overflow there is no bar.
+assert '.labPage.fxlabScrollable{scrollbar-width:none!important}' in web
+assert '.labPage.fxlabScrollable:hover{scrollbar-width:thin!important}' in web
+assert '.labPage.fxlabScrollable:hover::-webkit-scrollbar{width:5px!important}' in web
+assert '.labSourcesListV2{flex:1;min-height:0;overflow-y:auto;padding-right:2px;scrollbar-width:none}' in web
+assert '.labSourcesListV2:hover::-webkit-scrollbar{width:5px}' in web
+
 # Layer ordering is real composition ordering. Drop upper/lower half means before/after.
 assert 'row.draggable=true' in web
 assert 'function v2Move(fromId,toId,after)' in web
@@ -39,12 +69,6 @@ assert "ev.dataTransfer.setData('text/plain',layer.id)" in web
 assert 'for(var i=v2Layers.length-1;i>=0;i--)' in web
 assert "v2Layers.unshift(layer)" in web
 assert "v2Move(from,v2Layers[v2Layers.length-1].id,true)" in web
-
-# LIVE VIEW stays permanent but remains reorderable.
-assert "id:'live'" in web
-assert "name:'LIVE VIEW'" in web
-assert 'removable:false' in web
-assert "row.draggable=true" in web
 assert "if(!layer||!layer.removable)return" in web
 
 # Browser decides codec support. Common CapCut / WhatsApp containers are offered.
@@ -97,4 +121,4 @@ with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False, encoding='utf-
     js_path = f.name
 subprocess.run(['node', '--check', js_path], check=True)
 
-print('FX Lab Console Layout V2 protected: compact one-line layers, header add, bidirectional drag reorder')
+print('FX Lab Console Layout V2 protected: clean titles, compact pipeline, hover scrollbars, bidirectional layer reorder')
