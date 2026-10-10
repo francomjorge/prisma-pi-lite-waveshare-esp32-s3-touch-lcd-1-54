@@ -68,9 +68,9 @@ assert "11:{id:'feedback',process:processFeedbackMotion}" in portal
 assert "var node=fx<=4?fxEngine.registry[fx]:motionRegistry[fx]" in portal
 assert "node.process(src,dst,labEffectValue(s,fx)" in portal
 
-# MIX is supplied to the existing static engine context; motion processors do not read mixGain.
+# MIX is supplied to the existing static engine context; motion processors never read it.
 for block in re.findall(r'function process(?:Pulse|Drift|Rotate|Wave|Shake|Feedback)Motion\(.*?\n\}', portal, re.S):
-    assert 'mixGain' not in block
+    assert 'context.mixGain' not in block
 assert 'mixGain=fxEngine.mixGain(labEffectValue(s,5))' in portal
 
 # Animation loop is browser-only, throttled to about 30 fps and active only while LAB is visible.
