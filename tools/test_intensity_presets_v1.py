@@ -9,6 +9,7 @@ root=Path(__file__).resolve().parents[1]
 app=(root/'main/app_checkpoint_a.c').read_text(encoding='utf-8')
 portal=(root/'main/wifi_portal_checkpoint_a.c').read_text(encoding='utf-8')
 wrapper=(root/'main/wifi_portal_intensity.c').read_text(encoding='utf-8')
+layout=(root/'main/wifi_portal_layout_v2.c').read_text(encoding='utf-8') if (root/'main/wifi_portal_layout_v2.c').exists() else ''
 cmake=(root/'main/CMakeLists.txt').read_text(encoding='utf-8')
 
 # Appliance keeps the validated four-button 0 / 1 / 2 / 3 UI and 3-color cycle.
@@ -64,8 +65,11 @@ assert 'motion_value[motion]=value;' in app
 assert 'effect_enabled[effect]=!effect_enabled[effect];' in app
 assert 'motion_enabled[motion]=!motion_enabled[motion];' in app
 
-# Browser reflects the appliance-owned state only; no FREE/status word beside INTENSITY.
-assert '"wifi_portal_intensity.c"' in cmake
+# Browser reflects the appliance-owned state only; intensity wrapper remains in the include chain.
+if '"wifi_portal_layout_v2.c"' in cmake:
+    assert '#include "wifi_portal_intensity.c"' in layout
+else:
+    assert '"wifi_portal_intensity.c"' in cmake
 assert '#include "wifi_portal_checkpoint_a.c"' in wrapper
 assert 'intensityPresetState' not in wrapper
 assert '>FREE<' not in wrapper
