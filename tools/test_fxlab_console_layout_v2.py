@@ -41,6 +41,11 @@ assert 'BROWSER CANNOT DECODE' in web
 assert 'loadeddata' in web
 assert 'V2_MAX_BYTES=50*1024*1024' in web
 
+# Root handler interception must not rename/redefine the stable intensity handler.
+assert 'layout_v2_register_uri' in web
+assert 'copy.handler = layout_v2_page_get' in web
+assert '#include "wifi_portal_intensity.c"' in web
+
 # No persistent storage/control path added by this web-only feature.
 assert 'nvs_set' not in web
 assert 'esp_partition_write' not in web
@@ -58,7 +63,7 @@ for token in (
 
 # Syntax-check only the V2 injected JavaScript using Node when available.
 start = web.index('static const char fxlab_layout_v2_injection[] =')
-end = web.index('\nstatic esp_err_t checkpoint_page_get', start)
+end = web.index('\nstatic esp_err_t layout_v2_page_get', start)
 chunk = web[start:end]
 parts = []
 for line in chunk.splitlines()[1:]:
