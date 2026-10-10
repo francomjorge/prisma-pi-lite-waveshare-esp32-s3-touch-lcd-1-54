@@ -23,15 +23,42 @@
 #define MOTION_COUNT 6
 #define MOTION_BAR_X 110
 #define MOTION_BAR_W 84
+#define INTENSITY_BUTTON_X 12
+#define INTENSITY_BUTTON_Y 108
+#define INTENSITY_BUTTON_W 48
+#define INTENSITY_BUTTON_H 28
+#define INTENSITY_BUTTON_GAP 8
 
 static const char *SYNC_TAG = "WEB_SYNC";
 static bool motion_enabled[MOTION_COUNT] = {false,false,false,false,false,false};
 static int motion_value[MOTION_COUNT] = {50,50,50,50,50,50};
 static const char *motion_names[MOTION_COUNT] = {"PULSE","DRIFT","ROTATE","WAVE","SHAKE","FEEDBACK"};
+static int intensity_button = 0;
+static int intensity_level = 0;
+
+static int cp_intensity_state(void)
+{
+    if(intensity_button<=0)return 0;
+    return ((intensity_button-1)*3)+intensity_level+1;
+}
+
+static void cp_select_intensity_button(int button)
+{
+    if(button<=0){
+        intensity_button=0;
+        intensity_level=0;
+    }else if(button==intensity_button){
+        intensity_level=(intensity_level+1)%3;
+    }else{
+        intensity_button=button;
+        intensity_level=0;
+    }
+    ESP_LOGI(SYNC_TAG,"INTENSITY button=%d level=%d state=%d",intensity_button,intensity_level,cp_intensity_state());
+}
 
 bool prisma_appliance_get_on(void){return prisma_shared_on;}
 int prisma_appliance_get_mode(void){return prisma_shared_mode ? 1 : 0;}
-int prisma_appliance_get_intensity(void){return prisma_shared_intensity;}
+int prisma_appliance_get_intensity(void){return cp_intensity_state();}
 const char *prisma_appliance_get_filename(void){return prisma_storage_current();}
 bool prisma_appliance_get_effect(int effect){if(effect<0||effect>=EFFECT_COUNT)return false;if(effect==5)return true;return effect_enabled[effect];}
 int prisma_appliance_get_effect_value(int effect){if(effect<0||effect>=EFFECT_COUNT)return 0;return effect_value[effect];}
@@ -52,10 +79,23 @@ static void cp_page_intro(int phase)
 
 static void cp_page_controls(void)
 {
-    uint16_t bg=rgb(4,7,12),wh=rgb(240,245,250),cy=rgb(35,220,220),dim=rgb(45,60,75),disabled=rgb(75,82,90),blue=rgb(25,65,145),green=rgb(35,200,110),red=rgb(230,55,65);
+    uint16_t bg=rgb(4,7,12),wh=rgb(240,245,250),cy=rgb(35,220,220),dim=rgb(45,60,75),disabled=rgb(75,82,90),blue=rgb(25,65,145),green=rgb(35,200,110),yellow=rgb(245,190,35),red=rgb(230,55,65);
     uint16_t fg=prisma_shared_on?wh:disabled,accent=prisma_shared_on?cy:disabled;clear(bg);
     text(12,10,"PRISMA-PI",2,wh);rect(174,7,54,28,prisma_shared_on?green:red);text_box_center(174,54,14,prisma_shared_on?"ON":"OFF",2,wh);text(12,47,"NOW PLAYING",1,accent);text(12,60,prisma_storage_current(),2,fg);text(12,91,"INTENSITY",2,fg);
-    char pct[8];snprintf(pct,sizeof(pct),"%d",prisma_shared_intensity);text(198,91,pct,2,fg);rect(12,114,216,10,dim);rect(12,114,prisma_shared_on?(216*prisma_shared_intensity/100):0,10,accent);text(12,151,"MODE",2,fg);rect(86,143,142,34,prisma_shared_on?blue:dim);text_box_center(86,142,154,prisma_shared_mode?"BYPASS":"RANDOM",2,fg);cp_dots(1,prisma_shared_on?cy:disabled,dim);show();
+    for(int i=0;i<4;i++){
+        int x=INTENSITY_BUTTON_X+i*(INTENSITY_BUTTON_W+INTENSITY_BUTTON_GAP);
+        uint16_t box=dim;
+        if(i==intensity_button){
+            if(i==0)box=cy;
+            else if(intensity_level==0)box=green;
+            else if(intensity_level==1)box=yellow;
+            else box=red;
+        }
+        rect(x,INTENSITY_BUTTON_Y,INTENSITY_BUTTON_W,INTENSITY_BUTTON_H,box);
+        char label[2]={(char)('0'+i),0};
+        text_box_center(x,INTENSITY_BUTTON_W,INTENSITY_BUTTON_Y+7,label,2,wh);
+    }
+    text(12,151,"MODE",2,fg);rect(86,143,142,34,prisma_shared_on?blue:dim);text_box_center(86,142,154,prisma_shared_mode?"BYPASS":"RANDOM",2,fg);cp_dots(1,prisma_shared_on?cy:disabled,dim);show();
 }
 
 static void cp_page_monitor(void)
@@ -129,7 +169,7 @@ void app_main(void)
             if(page==0&&home_cooldown==0)glitch(startx,starty);
             else if(page==1&&startx>=170&&startx<=232&&starty>=5&&starty<=42){toggle_power();cp_draw_page(1,phase);}
             else if(page==1&&startx>=12&&startx<=165&&starty>=45&&starty<=85){const char *src=prisma_storage_next();prisma_control_set_filename(src);cp_draw_page(1,phase);ESP_LOGI(SYNC_TAG,"SOURCE -> %s",src);}
-            else if(page==1&&prisma_shared_on&&startx>=12&&startx<=228&&starty>=106&&starty<=132){prisma_shared_intensity=((int)startx-12)*100/216;if(prisma_shared_intensity<0)prisma_shared_intensity=0;if(prisma_shared_intensity>100)prisma_shared_intensity=100;cp_draw_page(1,phase);}
+            else if(page==1&&starty>=INTENSITY_BUTTON_Y-4&&starty<=INTENSITY_BUTTON_Y+INTENSITY_BUTTON_H+4&&startx>=INTENSITY_BUTTON_X&&startx<=228){int rel=(int)startx-INTENSITY_BUTTON_X;int stride=INTENSITY_BUTTON_W+INTENSITY_BUTTON_GAP;int button=rel/stride;int inside=rel%stride;if(button>=0&&button<4&&inside<INTENSITY_BUTTON_W){cp_select_intensity_button(button);cp_draw_page(1,phase);}}
             else if(page==1&&prisma_shared_on&&startx>=82&&startx<=232&&starty>=139&&starty<=181){prisma_shared_mode=prisma_shared_mode?0:1;cp_draw_page(1,phase);}
             else if(page==3&&starty>=FX_ROW_Y-6&&starty<FX_ROW_Y-6+EFFECT_COUNT*FX_ROW_STEP){int effect=((int)starty-(FX_ROW_Y-6))/FX_ROW_STEP;if(effect>=0&&effect<EFFECT_COUNT){if(effect==4){if(startx>=FX_BAR_X&&startx<FX_BAR_X+51){effect_enabled[4]=true;prisma_control_set_effect(4,true);}else if(startx>=FX_BAR_X+51&&startx<=FX_BAR_X+FX_BAR_W){effect_enabled[4]=false;prisma_control_set_effect(4,false);}}else if(startx<FX_BAR_X){if(effect<EFFECT_COUNT-1){effect_enabled[effect]=!effect_enabled[effect];prisma_control_set_effect(effect,effect_enabled[effect]);}else{effect_enabled[5]=true;prisma_control_set_effect(5,true);}}else if(prisma_shared_on&&startx<=FX_BAR_X+FX_BAR_W){int value=((int)startx-FX_BAR_X)*100/FX_BAR_W;if(value<0)value=0;if(value>100)value=100;effect_value[effect]=value;}cp_draw_page(3,phase);}}
             else if(page==5&&starty>=FX_ROW_Y-6&&starty<FX_ROW_Y-6+MOTION_COUNT*FX_ROW_STEP){int motion=((int)starty-(FX_ROW_Y-6))/FX_ROW_STEP;if(motion>=0&&motion<MOTION_COUNT){if(startx<MOTION_BAR_X)motion_enabled[motion]=!motion_enabled[motion];else if(prisma_shared_on&&startx<=MOTION_BAR_X+MOTION_BAR_W){int value=((int)startx-MOTION_BAR_X)*100/MOTION_BAR_W;if(value<0)value=0;if(value>100)value=100;motion_value[motion]=value;}ESP_LOGI(SYNC_TAG,"MOTION %s -> %s %d",motion_names[motion],motion_enabled[motion]?"ON":"OFF",motion_value[motion]);cp_draw_page(5,phase);}}
