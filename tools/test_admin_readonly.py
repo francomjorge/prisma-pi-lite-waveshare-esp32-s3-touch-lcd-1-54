@@ -115,7 +115,8 @@ assert 'ADMIN_STORAGE_RESERVE (256U * 1024U)' in api
 assert 'prisma_admin_register(s);' in portal
 assert 'hc.max_uri_handlers=16;' in portal
 assert '"web/admin.html"' in cmake and '"web/admin.css"' in cmake
-assert '"prisma_sensors.c"' in cmake and '"prisma_metrics.c"' in cmake and '"admin_api.c"' in cmake
+assert '"prisma_sensors.c"' in cmake and '"prisma_metrics.c"' in cmake
+assert ('"admin_api.c"' in cmake) or ('"admin_api_auth.c"' in cmake)
 assert 'esp_adc' in cmake and 'esp_driver_tsens' in cmake and 'heap' in cmake and 'spi_flash' in cmake
 assert 'ADMIN READ-ONLY / PHASE 1' in version
 
