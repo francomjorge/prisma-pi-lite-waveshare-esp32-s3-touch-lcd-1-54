@@ -6,9 +6,10 @@ import subprocess
 import tempfile
 
 root=Path(__file__).resolve().parents[1]
-app=(root/'main/app_checkpoint_a.c').read_text(encoding='utf-8')
+app=(root/'main/app_local_processing.c').read_text(encoding='utf-8')
 portal=(root/'main/wifi_portal_checkpoint_a.c').read_text(encoding='utf-8')
 wrapper=(root/'main/wifi_portal_intensity.c').read_text(encoding='utf-8')
+local_wrapper=(root/'main/wifi_portal_local_processing.c').read_text(encoding='utf-8')
 cmake=(root/'main/CMakeLists.txt').read_text(encoding='utf-8')
 
 # Appliance keeps the validated four-button 0 / 1 / 2 / 3 UI and 3-color cycle.
@@ -55,7 +56,7 @@ assert 'effect_enabled[5]=true;' in apply_block
 assert 'effect_value[5]=p->fx_value[5];' in apply_block
 assert 'motion_enabled[i]=p->motion_enabled[i];' in apply_block
 assert 'motion_value[i]=p->motion_value[i];' in apply_block
-select_block=app.split('static void cp_select_intensity_button(int button)',1)[1].split('bool prisma_appliance_get_on',1)[0]
+select_block=app.split('static void cp_select_intensity_button(int button)',1)[1].split('static void cp_reset_performance',1)[0]
 assert 'cp_apply_intensity_preset(state);' in select_block
 
 # Manual FX/Motion controls remain present after preset application; presets do not lock them.
@@ -64,9 +65,10 @@ assert 'motion_value[motion]=value;' in app
 assert 'effect_enabled[effect]=!effect_enabled[effect];' in app
 assert 'motion_enabled[motion]=!motion_enabled[motion];' in app
 
-# Browser reflects the appliance-owned state only; no FREE/status word beside INTENSITY.
-assert '"wifi_portal_intensity.c"' in cmake
+# Browser intensity UI remains layered below the new Local Processing wrapper.
+assert '"wifi_portal_local_processing.c"' in cmake
 assert '#include "wifi_portal_checkpoint_a.c"' in wrapper
+assert '#include "wifi_portal_intensity.c"' in local_wrapper
 assert 'intensityPresetState' not in wrapper
 assert '>FREE<' not in wrapper
 assert "intensityPreset0" in wrapper and "intensityPreset3" in wrapper
@@ -88,22 +90,21 @@ assert 'var intensityOldRunFxPipeline=runFxPipeline;' in wrapper
 assert 'mapped.motionValues=s.motionValues.slice();' in wrapper
 assert 'Math.pow(x,1.8)*100' in wrapper
 
-# No second state endpoint or poll.
+# No second intensity/motion state poll.
 assert "'/api/state?ts='+Date.now()" not in wrapper
+assert "'/api/state?ts='+Date.now()" not in local_wrapper
 assert '"/api/intensity"' not in wrapper
 assert '"/api/motion"' not in wrapper
 
-# Validate the extra browser JavaScript exactly as served.
+# Validate the intensity browser JavaScript exactly as served.
 match=re.search(r'static const char intensity_web_injection\[\]\s*=\s*(.*?);\n\nstatic esp_err_t checkpoint_page_get',wrapper,re.S)
 assert match
-literals=re.findall(r'"(?:\\.|[^"\\])*"',match.group(1))
-assert literals
+literals=re.findall(r'"(?:\\.|[^"\\])*"',match.group(1));assert literals
 injected=''.join(ast.literal_eval(x) for x in literals)
-script_match=re.search(r'<script>(.*?)</script>',injected,re.S)
-assert script_match
+script_match=re.search(r'<script>(.*?)</script>',injected,re.S);assert script_match
 with tempfile.NamedTemporaryFile('w',suffix='.js',encoding='utf-8',delete=False) as tmp:
     tmp.write(script_match.group(1)); path=tmp.name
 subprocess.run(['node','--check',path],check=True)
 Path(path).unlink(missing_ok=True)
 
-print('Intensity presets V3 protected: pixel nearly removed, rotate absent, motion response softened')
+print('Intensity presets V3 protected through active Local Processing wrappers')
