@@ -54,12 +54,17 @@ assert 'nvs_set' not in web
 
 # Reconstruct the adjacent C string literals and syntax-check the injected JS.
 block = web.split('static const char fxlab_sources_web_injection[] =', 1)[1]
-block = block.split(';\n\nstatic esp_err_t checkpoint_page_get', 1)[0]
 parts = []
 for line in block.splitlines():
     line = line.strip()
-    if line.startswith('"') and line.endswith('"'):
-        parts.append(ast.literal_eval(line))
+    if line.startswith('"'):
+        if line.endswith(';'):
+            line = line[:-1]
+        if line.endswith('"'):
+            try:
+                parts.append(ast.literal_eval(line))
+            except Exception:
+                pass
 injection = ''.join(parts)
 assert '<style>' in injection and '<script>' in injection
 scripts = re.findall(r'<script>(.*?)</script>', injection, re.S)
