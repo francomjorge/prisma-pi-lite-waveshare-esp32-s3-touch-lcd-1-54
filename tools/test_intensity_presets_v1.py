@@ -29,22 +29,21 @@ apply_block=app.split('static void cp_apply_intensity_preset(int state)',1)[1].s
 assert 'if(state<=0||state>9)return;' in apply_block
 assert apply_block.index('if(state<=0||state>9)return;') < apply_block.index('effect_enabled[i]=p->fx_enabled[i]')
 
-# Nine curated presets exist; pixel is intentionally absent in 1G/1Y/1R/2G/3G.
+# Nine curated presets exist. Pixel is absent everywhere except a very light 2R=8,
+# and ROTATE is disabled/value 0 in every preset.
 assert 'static const cp_intensity_preset_t intensity_presets[9]' in app
 for label in ('/* 1G */','/* 1Y */','/* 1R */','/* 2G */','/* 2Y */','/* 2R */','/* 3G */','/* 3Y */','/* 3R */'):
     assert label in app
 for expected in (
-    '{{false,false,false,true,false}, { 0, 6,15,12,50,45}',
-    '{{false,false,true,true,false},  { 0,10,22,20,50,48}',
-    '{{false,true,true,true,false},   { 0,16,28,30,50,52}',
-    '{{false,true,true,true,false},   { 0,24,34,40,50,56}',
-    '{{true,true,true,true,false},    {22,33,42,52,50,62}',
-    '{{true,true,true,true,true},     {25,43,50,64,50,68}',
-    '{{false,true,true,true,true},    { 0,54,58,74,50,75}',
-    '{{true,true,true,true,true},     {53,68,68,85,50,84}',
-    '{{true,true,true,true,true},     {62,86,80,96,50,95}',
-    '{60,48,38,56,30,62}',
-    '{74,62,52,74,46,86}',
+    '{{false,false,false,true,false}, { 0, 6,15,12,50,45}, {true,false,false,false,false,false}, {12, 6, 0, 5, 0, 5}}',
+    '{{false,false,true,true,false},  { 0,10,22,20,50,48}, {true,true,false,false,false,false},  {18,10, 0, 8, 0, 8}}',
+    '{{false,true,true,true,false},   { 0,16,28,30,50,52}, {true,true,false,true,false,false},   {24,14, 0,12, 0,10}}',
+    '{{false,true,true,true,false},   { 0,24,34,40,50,56}, {true,true,false,true,true,false},    {30,20, 0,18, 7,14}}',
+    '{{false,true,true,true,false},   { 0,33,42,52,50,62}, {true,true,false,true,true,false},    {36,26, 0,25,10,20}}',
+    '{{true,true,true,true,true},     { 8,43,50,64,50,68}, {true,true,false,true,true,true},     {43,32, 0,32,14,28}}',
+    '{{false,true,true,true,true},    { 0,54,58,74,50,75}, {true,true,false,true,true,true},     {50,38, 0,42,20,38}}',
+    '{{false,true,true,true,true},    { 0,68,68,85,50,84}, {true,true,false,true,true,true},     {60,48, 0,56,30,62}}',
+    '{{false,true,true,true,true},    { 0,86,80,96,50,95}, {true,true,false,true,true,true},     {74,62, 0,74,46,86}}',
 ):
     assert expected in app
 
@@ -84,6 +83,11 @@ assert '.intensity' not in run_block
 assert 'prisma_appliance_get_intensity()' in portal
 assert '\\"intensity\\":%d' in portal
 
+# Motion response is intentionally softened in the browser without changing displayed slider values.
+assert 'var intensityOldRunFxPipeline=runFxPipeline;' in wrapper
+assert 'mapped.motionValues=s.motionValues.slice();' in wrapper
+assert 'Math.pow(x,1.8)*100' in wrapper
+
 # No second state endpoint or poll.
 assert "'/api/state?ts='+Date.now()" not in wrapper
 assert '"/api/intensity"' not in wrapper
@@ -102,4 +106,4 @@ with tempfile.NamedTemporaryFile('w',suffix='.js',encoding='utf-8',delete=False)
 subprocess.run(['node','--check',path],check=True)
 Path(path).unlink(missing_ok=True)
 
-print('Intensity presets V2 pixel tune protected: selective pixel OFF and reduced yellow/red pixel values')
+print('Intensity presets V3 protected: pixel nearly removed, rotate absent, motion response softened')
