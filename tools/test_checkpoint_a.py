@@ -17,7 +17,7 @@ assert '"wifi_portal.c"' not in cmake.split('SRCS',1)[1].split('INCLUDE_DIRS',1)
 assert '#include "main.c"' in app
 assert '#include "wifi_portal.c"' in portal
 
-# Physical appliance grows from 4 to 6 pages without modifying legacy main.c.
+# Physical appliance remains the physically validated six-page checkpoint.
 assert '#define CP_PAGE_COUNT 6' in app
 assert 'int xs[6]={76,92,108,124,140,156}' in app
 assert 'cp_page_fx_lab' in app
@@ -29,7 +29,7 @@ assert 'cp_page_intro' in app and 'cp_page_controls' in app and 'cp_page_monitor
 assert 'page_intro(phase);cp_finish_page' not in app
 assert 'page_controls();cp_finish_page' not in app
 
-# Six independent motion controls: no MIX and no browser animation processing yet.
+# Six independent motion controls remain appliance-owned and do not use MIX.
 for name in ('PULSE','DRIFT','ROTATE','WAVE','SHAKE','FEEDBACK'):
     assert f'"{name}"' in app
 assert 'MOTION_COUNT 6' in app
@@ -56,7 +56,7 @@ assert '"/api/motion"' not in portal
 assert "'/api/state?ts='+Date.now()" in index
 assert index.count("'/api/state?ts='+Date.now()") == 1
 
-# Web stays based on physically validated 5-page ALLFX UI and receives page 6 at serve time.
+# Web stays based on physically validated ALLFX UI and receives page 6 at serve time.
 assert index.count('<section class="page') == 5
 assert "var sec=document.createElement('section')" in portal
 assert "sec.className='page motionPage'" in portal
@@ -67,15 +67,34 @@ assert "16.6666667%" in portal
 assert "document.getElementById('d5')" in portal
 assert "drawMotion=function" in portal
 
-# Requested FX Lab polish is injected without changing effect algorithms.
+# Unified FX Lab pipeline: static FX + MIRROR + six MOTION nodes are movable; MIX alone is fixed.
+assert "labFxNames=['PIXEL','GLITCH','POSTER','HUE','MIRROR','MIX','PULSE','DRIFT','ROTATE','WAVE','SHAKE','FEEDBACK']" in portal
+assert "allowed=[0,1,2,3,4,6,7,8,9,10,11]" in portal
+assert "out.push(5)" in portal
+assert "prismaFxLabOrderV1" in portal
+assert "if(i>=6&&i<=11)" in portal
+assert "motionEffects" in portal and "motionValues" in portal
+assert "if(fx===5)return" in portal
+assert "if(from===5||fx===5)return" in portal
+assert "fx===4?'ON'" in portal
+assert "appendLabMixBlock(s,fixedRow)" in portal
+assert "appendLabMirrorBlock(s,fixedRow)" not in portal
+assert "MIX FIXED" in portal
+assert "MIRROR + MIX FIXED" not in portal
+
+# FX Lab visual frame remains present but disappears into the black page background.
+assert '.labFrame{background:#000!important;border-color:#000!important;box-shadow:none!important}' in portal
+assert '.labWaiting{background:#000!important}' in portal
 assert '.labFrame .labFsBtn{opacity:0!important' in portal
 assert '.labFrame:hover .labFsBtn' in portal
-assert "name.textContent='MIRROR'" in portal
-assert "name.textContent='MIX'" in portal
 assert "textContent='FIXED'" not in portal
 assert "textContent='END'" not in portal
+
+# Existing static effect algorithms stay in the original web document and remain unchanged here.
 assert 'processPixelFx' in index and 'processGlitchFx' in index
 assert 'processPosterFx' in index and 'processHueFx' in index and 'processMirrorFx' in index
+assert 'processPixelFx' not in portal and 'processGlitchFx' not in portal
+assert 'processPosterFx' not in portal and 'processHueFx' not in portal and 'processMirrorFx' not in portal
 
 # Existing backend/source/admin behavior remains inherited from legacy portal.
 assert '"/source/*"' in legacy_portal
@@ -83,4 +102,4 @@ assert 'prisma_admin_register' in portal
 assert 'hc.lru_purge_enable=true' in portal
 assert 'no_cache(r)' in portal
 
-print('Checkpoint A protected: 6 appliance pages + web page 6 motion state, no motion processing')
+print('Unified FX Lab protected: movable static + motion + mirror pipeline, MIX fixed, no motion processing yet')
