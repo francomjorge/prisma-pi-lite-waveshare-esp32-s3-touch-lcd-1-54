@@ -14,17 +14,21 @@ assert '"wifi_portal_layout_v2.c"' in cmake
 assert '"app_checkpoint_a.c"' in cmake
 assert 'wifi_portal_layout_v2.c' not in app
 
-# Three-column workbench: preview occupies two columns, Sources the third.
+# Three-column workbench: larger preview, shorter Sources panel.
 assert 'grid-template-columns:repeat(3,minmax(0,1fr))' in web
-assert '.labWorkbenchV2 .labFrame{grid-column:1/3' in web
-assert '.labSourcesPanelV2{grid-column:3' in web
+assert '.labWorkbenchV2 .labFrame{grid-column:1/3;height:290px!important;min-height:290px}' in web
+assert '.labSourcesPanelV2{grid-column:3;height:225px;align-self:start' in web
 assert "work.appendChild(labFrame)" in web
 assert "oldPanel.style.display='none'" in web
 
-# Compact technical console: one row per layer, small controls, add button in header.
-assert '.labLayerV2{height:27px;display:grid' in web
-assert 'grid-template-columns:14px 18px minmax(0,1fr) 64px 28px 18px' in web
-assert '.labEyeV2,.labDeleteV2{width:18px;height:18px' in web
+# Compact technical console: only the name/grip zone can start layer reorder.
+assert '.labLayerV2{height:27px;display:grid;grid-template-columns:18px minmax(0,1fr) 64px 28px 18px 18px' in web
+assert '.labEyeV2,.labDeleteV2,.labMoreV2{width:18px;height:18px' in web
+assert 'row.draggable=false' in web
+assert 'dragZone.draggable=true' in web
+assert "dragZone.title='Drag layer / click to select'" in web
+assert 'range.draggable=false' in web
+assert 'range.onpointerdown=function(ev){ev.stopPropagation()}' in web
 assert 'labAddSourceV2' in web
 assert 'title=\\"Add source\\">+</button>' in web
 assert '+ ADD SOURCE' not in web
@@ -39,34 +43,59 @@ assert 'if(fxSub)fxSub.remove()' in web
 assert 'if(pipeSub)pipeSub.remove()' in web
 assert 'if(motionSub)motionSub.remove()' in web
 
-# LIVE source display name is now APPLIANCE IMAGEN, while the internal id stays stable.
+# LIVE source display name is APPLIANCE IMAGEN; internal id remains stable.
 assert "id:'live'" in web
 assert "name:'APPLIANCE IMAGEN'" in web
-assert "layer.type==='live'?'APPLIANCE IMAGEN':'LOCAL VIDEO'" in web
 assert 'removable:false' in web
 
-# Active FX pipeline is visually compact without changing processing semantics.
+# Source selection toggles, shows an overlay, and can be moved by pointer drag.
+assert "function v2ToggleSelect(id)" in web
+assert "v2Selected=(v2Selected===id?'':id)" in web
+assert 'function v2DrawSelectionOverlay()' in web
+assert "ctx.strokeStyle='#23dcdc'" in web
+assert "labCanvas.addEventListener('pointerdown'" in web
+assert 'labCanvas.setPointerCapture(ev.pointerId)' in web
+assert "labCanvas.addEventListener('pointermove'" in web
+assert 'v2Pointer.layer.x=' in web and 'v2Pointer.layer.y=' in web
+
+# Three-dot inspector is present. SIZE works now; TRIM/CROP are deliberate mockups.
+assert "more.textContent='⋯'" in web
+assert "trim.textContent='TRIM'" in web
+assert "crop.textContent='CROP'" in web
+assert "sizeLabel.textContent='SIZE'" in web
+assert "sizeRange.min='25'" in web and "sizeRange.max='200'" in web
+assert 'layer.size=Math.max(.25,Math.min(2,Number(sizeRange.value)/100))' in web
+assert "v2Status('TRIM CONTROL · NEXT','')" in web
+assert "v2Status('CROP CONTROL · NEXT','')" in web
+
+# Transform state is non-destructive and composed before the existing global FX chain.
+for token in ('size:1','x:0','y:0','cropX:0','cropY:0','cropW:1','cropH:1','trimIn:0','trimOut:0'):
+    assert token in web
+assert 'function v2LayerGeometry(layer,w,h,rot)' in web
+assert 'function v2DrawLayer(ctx,layer,w,h,sw,sh,rot)' in web
+assert 'for(var i=v2Layers.length-1;i>=0;i--)' in web
+assert 'v2DrawLayer(ctx,layer,w,h,sw,sh,rot)' in web
+
+# Active FX pipeline remains compact.
 assert '.labPipeline{gap:4px!important;margin-top:5px!important;min-height:28px!important}' in web
 assert '.labBlock{gap:4px!important;border-radius:8px!important;padding:4px 5px!important;min-height:27px!important}' in web
 assert '.labMove{width:18px!important;height:18px!important' in web
 assert '.labBlockName{font-size:9px!important' in web
 assert '.labReverse{padding:5px 7px!important;font-size:8px!important' in web
 
-# Page and Sources scrollbars stay hidden until hover; if no overflow there is no bar.
+# Page and Sources scrollbars stay hidden until hover.
 assert '.labPage.fxlabScrollable{scrollbar-width:none!important}' in web
 assert '.labPage.fxlabScrollable:hover{scrollbar-width:thin!important}' in web
 assert '.labPage.fxlabScrollable:hover::-webkit-scrollbar{width:5px!important}' in web
 assert '.labSourcesListV2{flex:1;min-height:0;overflow-y:auto;padding-right:2px;scrollbar-width:none}' in web
 assert '.labSourcesListV2:hover::-webkit-scrollbar{width:5px}' in web
 
-# Layer ordering is real composition ordering. Drop upper/lower half means before/after.
-assert 'row.draggable=true' in web
+# Layer ordering remains real composition ordering. Drop upper/lower half means before/after.
 assert 'function v2Move(fromId,toId,after)' in web
 assert 'if(after)b++;' in web
 assert 'ev.clientY>rect.top+rect.height/2' in web
 assert "after?'dragAfter':'dragBefore'" in web
 assert "ev.dataTransfer.setData('text/plain',layer.id)" in web
-assert 'for(var i=v2Layers.length-1;i>=0;i--)' in web
 assert "v2Layers.unshift(layer)" in web
 assert "v2Move(from,v2Layers[v2Layers.length-1].id,true)" in web
 assert "if(!layer||!layer.removable)return" in web
@@ -97,7 +126,7 @@ for token in (
 ):
     assert token in app
 
-# Syntax-check only the V2 injected JavaScript using Node when available.
+# Syntax-check only the V2 injected JavaScript using Node.
 start = web.index('static const char fxlab_layout_v2_injection[] =')
 end = web.index('\nstatic esp_err_t layout_v2_page_get', start)
 chunk = web[start:end]
@@ -121,4 +150,4 @@ with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False, encoding='utf-
     js_path = f.name
 subprocess.run(['node', '--check', js_path], check=True)
 
-print('FX Lab Console Layout V2 protected: clean titles, compact pipeline, hover scrollbars, bidirectional layer reorder')
+print('FX Lab editor protected: drag-handle-only reorder, toggle selection, canvas positioning, size inspector, trim/crop mockups')
