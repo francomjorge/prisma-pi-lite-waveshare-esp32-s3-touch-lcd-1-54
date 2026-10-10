@@ -34,6 +34,10 @@ assert 'motion_enabled[MOTION_COUNT]' in app
 assert 'motion_value[MOTION_COUNT]' in app
 assert 'prisma_appliance_get_motion_effect' in app
 assert 'prisma_appliance_get_motion_value' in app
+assert '#define MOTION_BAR_X 110' in app
+assert '#define MOTION_BAR_W 84' in app
+assert 'rect(MOTION_BAR_X' in app
+assert 'startx<MOTION_BAR_X' in app
 assert 'requestAnimationFrame' not in portal
 assert 'processMotion' not in portal
 assert 'MOTION FX / READ ONLY' in portal
