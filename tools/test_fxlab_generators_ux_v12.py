@@ -12,7 +12,9 @@ assert 'wifi_portal_record_v11.c' in cmake
 assert 'v11_wrapped_httpd_resp_send_chunk' in cmake
 assert 'wifi_portal_record_v11_nested.c' in cmake
 assert 'web/fxlab_v12.js' in cmake
-assert '_binary_web_fxlab_v12_js_start' in wrap
+assert '_binary_fxlab_v12_js_start' in wrap
+assert '_binary_fxlab_v12_js_end' in wrap
+assert '_binary_web_fxlab_v12_js_start' not in wrap
 assert 'v11_wrapped_httpd_resp_send_chunk' in wrap
 
 # Curated continuous generator set; weak GRID/TUNNEL controls are removed.
@@ -65,4 +67,4 @@ assert 'nvs_set' not in js
 assert 'esp_partition_write' not in js
 
 subprocess.run(['node', '--check', str(root / 'main' / 'web' / 'fxlab_v12.js')], check=True)
-print('FX Lab V12 protected: continuous generators, curated ASCII, black stage, precision drag')
+print('FX Lab V12 protected: continuous generators, curated ASCII, black stage, precision drag, embedded script symbols')
