@@ -5,8 +5,11 @@
 extern esp_err_t v11_wrapped_httpd_resp_send_chunk(httpd_req_t *r, const char *buf, ssize_t len);
 extern esp_err_t __real_httpd_resp_send_chunk(httpd_req_t *r, const char *buf, ssize_t len);
 
-extern const unsigned char fxlab_v12_js_start[] asm("_binary_web_fxlab_v12_js_start");
-extern const unsigned char fxlab_v12_js_end[] asm("_binary_web_fxlab_v12_js_end");
+/* ESP-IDF v5.5.1 data_file_embed_asm.cmake derives symbols from the
+ * embedded file basename, so web/fxlab_v12.js exports fxlab_v12_js_*.
+ */
+extern const unsigned char fxlab_v12_js_start[] asm("_binary_fxlab_v12_js_start");
+extern const unsigned char fxlab_v12_js_end[] asm("_binary_fxlab_v12_js_end");
 
 esp_err_t __wrap_httpd_resp_send_chunk(httpd_req_t *r, const char *buf, ssize_t len)
 {
