@@ -13,6 +13,7 @@ assert 'wifi_portal_record_v10.c' in cmake
 assert 'v10_wrapped_httpd_resp_send_chunk' in cmake
 assert 'wifi_portal_record_v10_nested.c' in cmake
 assert 'FX LAB V11' in src
+assert 'extern esp_err_t __real_httpd_resp_send_chunk' in src
 
 # Chroma uses a readback-optimized canvas and only scans the active layer ROI.
 assert 'willReadFrequently:true' in src
