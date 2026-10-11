@@ -1,12 +1,12 @@
 idf_component_register(
-    SRCS "app_checkpoint_a.c" "wifi_portal_layout_v5.c" "wifi_portal_record_v6.c" "prisma_touch.c" "prisma_sensors.c" "storage.c" "prisma_power.c" "prisma_metrics.c" "admin_api_auth.c"
+    SRCS "app_checkpoint_a.c" "wifi_portal_layout_v5.c" "wifi_portal_record_v9.c" "prisma_touch.c" "prisma_sensors.c" "storage.c" "prisma_power.c" "prisma_metrics.c" "admin_api_auth.c"
     INCLUDE_DIRS "."
     REQUIRES esp_wifi esp_event esp_netif nvs_flash esp_http_server esp_driver_gpio esp_driver_spi esp_driver_i2c esp_driver_tsens esp_lcd spiffs json esp_adc esp_app_format esp_timer heap spi_flash
     EMBED_TXTFILES "web/index.html" "web/style.css" "web/admin.html" "web/admin.css" "web/admin.js"
 )
 
-# V6 is additive: intercept final web response chunks only to inject the browser-side REC patch.
+# V9 compiles the validated V8 recorder through an additive wrapper and injects reset/zoom/15s behavior.
 target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=httpd_resp_send_chunk")
 
-# Compatibility markers for protected V2/V3/V4/V5 tests: "wifi_portal_layout_v2.c" "wifi_portal_layout_v3.c" "wifi_portal_layout_v4.c" "wifi_portal_layout_v5.c"
+# Compatibility markers for protected V2/V3/V4/V5/V6/V7/V8 tests: "wifi_portal_layout_v2.c" "wifi_portal_layout_v3.c" "wifi_portal_layout_v4.c" "wifi_portal_layout_v5.c" "wifi_portal_record_v6.c"
 spiffs_create_partition_image(storage ../storage FLASH_IN_PROJECT)
