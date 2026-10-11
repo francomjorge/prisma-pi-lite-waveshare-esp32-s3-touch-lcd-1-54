@@ -3,6 +3,7 @@
 
 /* V11 is injected inside the existing FX Lab closure after the V10 patch. */
 extern esp_err_t v10_wrapped_httpd_resp_send_chunk(httpd_req_t *r, const char *buf, ssize_t len);
+extern esp_err_t __real_httpd_resp_send_chunk(httpd_req_t *r, const char *buf, ssize_t len);
 
 static const char fxlab_record_v11_patch[] =
 "\n"
