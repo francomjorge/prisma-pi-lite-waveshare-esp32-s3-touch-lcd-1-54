@@ -3,7 +3,7 @@ name: ESP-IDF build
 
 on:
   push:
-    branches: [main, m4.3-consolidated, m4.3-web4-readonly, m4.4-page2-bidirectional, m4.5-unified-build58-sync, m4.6-page2-build58-readonly, m4.7-page2-direct-readonly, m4.8-sync-lab, m4.9-global-web-sync, m4.10-clean-assets, m4.11-correct-assets-ci, m4.11-controller-stable, v5.0-no-effect-no-admin, v1.0-stable-power, v1.0-web-keyboard-nav, v1.0-liveview-rotate-key, v1.1-admin-readonly, v1.1-admin-official-telemetry, v0-fxlab-page5, v0-fxlab-rotate, v0-fxengine-infra, v0-fxengine-pixel-v1, v0-fxengine-glitch-v1-fullscreen, v0-fxengine-allfx-v1, v0-checkpoint-a-six-pages-motion, v0-fxlab-unified-pipeline-v1, v0-motionfx-v1-all, v0-master-behavior-v1, v0-intensity-presets-ui-v1, v0-intensity-presets-v2, v0-intensity-presets-v2-pixel-tune, v0-powercycle-reset-v1, v0-presets-granularity-admin-auth-v1, web-fxlab-sources-v1, web-fxlab-console-layout-v2, web-fxlab-mobile-rotation-v3, web-fxlab-generator-v4, web-fxlab-output-ascii-v5, web-fxlab-recording-v6, web-fxlab-recording-v7-part1, web-fxlab-detach-aspect-v8, web-fxlab-reset-detach-zoom-v9]
+    branches: [main, m4.3-consolidated, m4.3-web4-readonly, m4.4-page2-bidirectional, m4.5-unified-build58-sync, m4.6-page2-build58-readonly, m4.7-page2-direct-readonly, m4.8-sync-lab, m4.9-global-web-sync, m4.10-clean-assets, m4.11-correct-assets-ci, m4.11-controller-stable, v5.0-no-effect-no-admin, v1.0-stable-power, v1.0-web-keyboard-nav, v1.0-liveview-rotate-key, v1.1-admin-readonly, v1.1-admin-official-telemetry, v0-fxlab-page5, v0-fxlab-rotate, v0-fxengine-infra, v0-fxengine-pixel-v1, v0-fxengine-glitch-v1-fullscreen, v0-fxengine-allfx-v1, v0-checkpoint-a-six-pages-motion, v0-fxlab-unified-pipeline-v1, v0-motionfx-v1-all, v0-master-behavior-v1, v0-intensity-presets-ui-v1, v0-intensity-presets-v2, v0-intensity-presets-v2-pixel-tune, v0-powercycle-reset-v1, v0-presets-granularity-admin-auth-v1, web-fxlab-sources-v1, web-fxlab-console-layout-v2, web-fxlab-mobile-rotation-v3, web-fxlab-generator-v4, web-fxlab-output-ascii-v5, web-fxlab-recording-v6, web-fxlab-recording-v7-part1, web-fxlab-detach-aspect-v8, web-fxlab-reset-detach-zoom-v9, web-fxlab-generators-chroma-efficiency-v10]
   workflow_dispatch:
 
 jobs:
@@ -54,6 +54,9 @@ jobs:
 
       - name: Validate FX Lab reset detached zoom V9
         run: python3 tools/test_fxlab_reset_detach_zoom_v9.py
+
+      - name: Validate FX Lab generators chroma efficiency V10
+        run: python3 tools/test_fxlab_generators_chroma_efficiency_v10.py
 
       - name: Install ESP-IDF v5.5.1
         uses: espressif/install-esp-idf-action@v1
