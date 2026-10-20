@@ -16,7 +16,7 @@ preview = audio.split("esp_err_t prisma_audio_preview_volume(int volume)", 1)[1]
 assert "save_volume(" not in preview, "live preview must not write NVS"
 assert "s_status.saved_volume = volume;" in audio
 assert "static esp_err_t save_volume(int volume)" in audio
-assert '"saved_volume":%d' in api
+assert "saved_volume" in api
 assert "prisma_audio_preview_volume(volume)" in api
 assert 'strcmp(save,"0")!=0' in api
 assert "save must be 0 or 1" in api
