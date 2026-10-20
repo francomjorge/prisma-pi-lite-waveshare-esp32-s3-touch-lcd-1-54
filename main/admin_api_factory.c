@@ -3,22 +3,22 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
 
 #include "esp_app_desc.h"
-#include "esp_netif.h"
-#include "esp_netif_ip_addr.h"
 #include "esp_system.h"
 #include "esp_timer.h"
-#include "esp_wifi.h"
+#include "network_service.h"
 #include "prisma_metrics.h"
 #include "storage.h"
 
 #define FACTORY_MAX_FILENAME 63
 #define FACTORY_MAX_UPLOAD_BYTES (4U * 1024U * 1024U)
 #define IO_CHUNK 2048
+#define FORM_MAX 256
 
 extern const uint8_t web_admin_html_start[] asm("_binary_admin_html_start");
 extern const uint8_t web_admin_html_end[] asm("_binary_admin_html_end");
@@ -64,15 +64,34 @@ static const char *reset_reason_name(esp_reset_reason_t reason)
     }
 }
 
-static void get_ap_ip(char *ipbuf, size_t size)
+static void json_escape(const char *src, char *dst, size_t dst_size)
 {
-    strlcpy(ipbuf, "192.168.4.1", size);
-    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
-    if (netif) {
-        esp_netif_ip_info_t ip = {0};
-        if (esp_netif_get_ip_info(netif, &ip) == ESP_OK)
-            snprintf(ipbuf, size, IPSTR, IP2STR(&ip.ip));
+    if (!dst || dst_size == 0) return;
+    size_t j = 0;
+    if (!src) src = "";
+    for (size_t i = 0; src[i] && j + 1 < dst_size; i++) {
+        unsigned char c = (unsigned char)src[i];
+        const char *esc = NULL;
+        char u[7];
+        if (c == '\\') esc = "\\\\";
+        else if (c == '"') esc = "\\\"";
+        else if (c == '\n') esc = "\\n";
+        else if (c == '\r') esc = "\\r";
+        else if (c == '\t') esc = "\\t";
+        else if (c < 0x20) {
+            snprintf(u, sizeof(u), "\\u%04x", c);
+            esc = u;
+        }
+        if (esc) {
+            size_t n = strlen(esc);
+            if (j + n >= dst_size) break;
+            memcpy(dst + j, esc, n);
+            j += n;
+        } else {
+            dst[j++] = (char)c;
+        }
     }
+    dst[j] = 0;
 }
 
 static esp_err_t overview_get(httpd_req_t *r)
@@ -82,7 +101,7 @@ static esp_err_t overview_get(httpd_req_t *r)
     const esp_app_desc_t *app = esp_app_get_description();
     char b[768];
     snprintf(b, sizeof(b),
-        "{\"version\":\"PRISMA-PI LITE FACTORY V1\","
+        "{\"version\":\"PRISMA-PI LITE ADMIN V2 A1\","
         "\"idf\":\"%s\",\"build_date\":\"%s\",\"build_time\":\"%s\","
         "\"uptime_ms\":%llu,\"heap_free\":%u,\"heap_min\":%u,"
         "\"reset_reason\":\"%s\",\"flash_bytes\":%u,\"psram_bytes\":%u,"
@@ -96,25 +115,153 @@ static esp_err_t overview_get(httpd_req_t *r)
     return send_json(r, b);
 }
 
-static esp_err_t network_get(httpd_req_t *r)
+static esp_err_t network_status_get(httpd_req_t *r)
 {
-    wifi_config_t cfg = {0};
-    if (esp_wifi_get_config(WIFI_IF_AP, &cfg) != ESP_OK)
-        return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "wifi unavailable");
+    prisma_network_status_t s;
+    prisma_network_get_status(&s);
 
-    uint8_t channel = 0;
-    wifi_second_chan_t second = WIFI_SECOND_CHAN_NONE;
-    esp_wifi_get_channel(&channel, &second);
-    wifi_sta_list_t stations = {0};
-    esp_wifi_ap_get_sta_list(&stations);
-    char ip[20];
-    get_ap_ip(ip, sizeof(ip));
+    char ap_ssid[80], sta_ssid[80];
+    json_escape(s.ap_ssid, ap_ssid, sizeof(ap_ssid));
+    json_escape(s.sta_ssid, sta_ssid, sizeof(sta_ssid));
 
-    char b[384];
+    char b[1400];
     snprintf(b, sizeof(b),
-        "{\"ssid\":\"%s\",\"ip\":\"%s\",\"channel\":%u,\"client_count\":%u,\"max_clients\":%u}",
-        (char *)cfg.ap.ssid, ip, (unsigned)channel, (unsigned)stations.num, (unsigned)cfg.ap.max_connection);
+        "{\"mode\":\"AP+STA\","
+        "\"ap\":{\"running\":%s,\"ssid\":\"%s\",\"ip\":\"%s\",\"mac\":\"%s\",\"channel\":%u,\"clients\":%u,\"secured\":%s},"
+        "\"sta\":{\"configured\":%s,\"connected\":%s,\"got_ip\":%s,\"auto_connect\":%s,"
+        "\"ssid\":\"%s\",\"ip\":\"%s\",\"gateway\":\"%s\",\"netmask\":\"%s\",\"mac\":\"%s\","
+        "\"rssi\":%d,\"channel\":%u,\"last_disconnect_reason\":%u}}",
+        s.ap_running ? "true" : "false", ap_ssid, s.ap_ip, s.ap_mac, (unsigned)s.ap_channel, (unsigned)s.ap_clients, s.ap_secured ? "true" : "false",
+        s.sta_configured ? "true" : "false", s.sta_connected ? "true" : "false", s.sta_got_ip ? "true" : "false", s.sta_auto_connect ? "true" : "false",
+        sta_ssid, s.sta_ip, s.sta_gateway, s.sta_netmask, s.sta_mac, (int)s.sta_rssi, (unsigned)s.sta_channel, (unsigned)s.last_disconnect_reason);
     return send_json(r, b);
+}
+
+static const char *auth_name(uint8_t auth)
+{
+    switch (auth) {
+        case 0: return "OPEN";
+        case 1: return "WEP";
+        case 2: return "WPA-PSK";
+        case 3: return "WPA2-PSK";
+        case 4: return "WPA/WPA2";
+        case 5: return "WPA2-ENTERPRISE";
+        case 6: return "WPA3-PSK";
+        case 7: return "WPA2/WPA3";
+        default: return "SECURED";
+    }
+}
+
+static esp_err_t network_scan_get(httpd_req_t *r)
+{
+    prisma_network_ap_t aps[PRISMA_NETWORK_MAX_SCAN];
+    memset(aps, 0, sizeof(aps));
+    int count = prisma_network_scan(aps, PRISMA_NETWORK_MAX_SCAN);
+    if (count < 0) return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "scan failed");
+
+    httpd_resp_set_type(r, "application/json");
+    no_cache(r);
+    if (httpd_resp_send_chunk(r, "{\"networks\":[", HTTPD_RESP_USE_STRLEN) != ESP_OK) return ESP_FAIL;
+    for (int i = 0; i < count; i++) {
+        char esc[80], item[240];
+        json_escape(aps[i].ssid, esc, sizeof(esc));
+        snprintf(item, sizeof(item), "%s{\"ssid\":\"%s\",\"rssi\":%d,\"channel\":%u,\"auth\":\"%s\",\"open\":%s}",
+                 i ? "," : "", esc, (int)aps[i].rssi, (unsigned)aps[i].channel,
+                 auth_name(aps[i].authmode), aps[i].authmode == 0 ? "true" : "false");
+        if (httpd_resp_send_chunk(r, item, HTTPD_RESP_USE_STRLEN) != ESP_OK) return ESP_FAIL;
+    }
+    if (httpd_resp_send_chunk(r, "]}", 2) != ESP_OK) return ESP_FAIL;
+    return httpd_resp_send_chunk(r, NULL, 0);
+}
+
+static int hexval(char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+static void url_decode(char *s)
+{
+    char *rd = s, *wr = s;
+    while (*rd) {
+        if (*rd == '%' && rd[1] && rd[2]) {
+            int hi = hexval(rd[1]), lo = hexval(rd[2]);
+            if (hi >= 0 && lo >= 0) { *wr++ = (char)((hi << 4) | lo); rd += 3; continue; }
+        }
+        *wr++ = (*rd == '+') ? ' ' : *rd;
+        rd++;
+    }
+    *wr = 0;
+}
+
+static bool read_form(httpd_req_t *r, char *buf, size_t buf_size)
+{
+    if (!r || !buf || buf_size < 2 || r->content_len <= 0 || r->content_len >= (int)buf_size) return false;
+    int left = r->content_len, pos = 0;
+    while (left > 0) {
+        int got = httpd_req_recv(r, buf + pos, left);
+        if (got == HTTPD_SOCK_ERR_TIMEOUT) continue;
+        if (got <= 0) return false;
+        pos += got;
+        left -= got;
+    }
+    buf[pos] = 0;
+    return true;
+}
+
+static bool form_value(const char *form, const char *key, char *out, size_t out_size)
+{
+    if (!form || !key || !out || out_size == 0) return false;
+    if (httpd_query_key_value(form, key, out, out_size) != ESP_OK) return false;
+    url_decode(out);
+    return true;
+}
+
+static esp_err_t network_connect_post(httpd_req_t *r)
+{
+    char form[FORM_MAX], ssid[33], password[65];
+    if (!read_form(r, form, sizeof(form)) || !form_value(form, "ssid", ssid, sizeof(ssid)))
+        return httpd_resp_send_err(r, HTTPD_400_BAD_REQUEST, "ssid required");
+    password[0] = 0;
+    form_value(form, "password", password, sizeof(password));
+    esp_err_t err = prisma_network_connect(ssid, password);
+    if (err != ESP_OK) return httpd_resp_send_err(r, HTTPD_400_BAD_REQUEST, "connect rejected");
+    return send_json(r, "{\"ok\":true,\"state\":\"connecting\"}");
+}
+
+static esp_err_t network_disconnect_post(httpd_req_t *r)
+{
+    esp_err_t err = prisma_network_disconnect();
+    if (err != ESP_OK) return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "disconnect failed");
+    return send_json(r, "{\"ok\":true}");
+}
+
+static esp_err_t network_reconnect_post(httpd_req_t *r)
+{
+    esp_err_t err = prisma_network_reconnect();
+    if (err != ESP_OK) return httpd_resp_send_err(r, HTTPD_400_BAD_REQUEST, "no saved network");
+    return send_json(r, "{\"ok\":true,\"state\":\"connecting\"}");
+}
+
+static esp_err_t network_forget_post(httpd_req_t *r)
+{
+    esp_err_t err = prisma_network_forget();
+    if (err != ESP_OK) return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "forget failed");
+    return send_json(r, "{\"ok\":true}");
+}
+
+static esp_err_t network_ap_post(httpd_req_t *r)
+{
+    char form[FORM_MAX], ssid[33], password[65];
+    if (!read_form(r, form, sizeof(form)) || !form_value(form, "ssid", ssid, sizeof(ssid)))
+        return httpd_resp_send_err(r, HTTPD_400_BAD_REQUEST, "ssid required");
+    password[0] = 0;
+    form_value(form, "password", password, sizeof(password));
+    esp_err_t err = prisma_network_set_ap(ssid, password);
+    if (err != ESP_OK) return httpd_resp_send_err(r, HTTPD_400_BAD_REQUEST, "AP password must be empty or 8-63 chars");
+    return send_json(r, "{\"ok\":true,\"warning\":\"AP settings applied; reconnect if your session drops\"}");
 }
 
 static bool visible_file(const char *name)
@@ -135,28 +282,6 @@ static bool sanitize_name(char *dst, size_t dst_size, const char *src)
     dst[j] = 0;
     if (!dst[0] || dst[0] == '.' || strstr(dst, "..") != NULL) return false;
     return true;
-}
-
-static int hexval(char c)
-{
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-    return -1;
-}
-
-static void url_decode(char *s)
-{
-    char *r = s, *w = s;
-    while (*r) {
-        if (*r == '%' && r[1] && r[2]) {
-            int hi = hexval(r[1]), lo = hexval(r[2]);
-            if (hi >= 0 && lo >= 0) { *w++ = (char)((hi << 4) | lo); r += 3; continue; }
-        }
-        *w++ = (*r == '+') ? ' ' : *r;
-        r++;
-    }
-    *w = 0;
 }
 
 static bool query_name(httpd_req_t *r, char *out, size_t out_size)
@@ -201,12 +326,13 @@ static esp_err_t files_list_get(httpd_req_t *r)
         while ((entry = readdir(dir)) != NULL) {
             if (!visible_file(entry->d_name)) continue;
             char path[128];
-            snprintf(path, sizeof(path), "/storage/%s", entry->d_name);
+            if (snprintf(path, sizeof(path), "/storage/%s", entry->d_name) >= (int)sizeof(path)) continue;
             struct stat st;
             if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) continue;
-            char item[256];
-            snprintf(item, sizeof(item), "%s{\"name\":\"%s\",\"size\":%u}",
-                     first ? "" : ",", entry->d_name, (unsigned)st.st_size);
+            char esc[160], item[320];
+            json_escape(entry->d_name, esc, sizeof(esc));
+            snprintf(item, sizeof(item), "%s{\"name\":\"%s\",\"size\":%u,\"type\":\"%s\"}",
+                     first ? "" : ",", esc, (unsigned)st.st_size, mime_for(entry->d_name));
             first = false;
             if (httpd_resp_send_chunk(r, item, HTTPD_RESP_USE_STRLEN) != ESP_OK) { closedir(dir); return ESP_FAIL; }
         }
@@ -317,7 +443,14 @@ void prisma_admin_register(httpd_handle_t server)
     httpd_uri_t admin = {.uri="/admin",.method=HTTP_GET,.handler=admin_page_get};
     httpd_uri_t css = {.uri="/admin.css",.method=HTTP_GET,.handler=admin_css_get};
     httpd_uri_t overview = {.uri="/api/admin/overview",.method=HTTP_GET,.handler=overview_get};
-    httpd_uri_t network = {.uri="/api/admin/network",.method=HTTP_GET,.handler=network_get};
+    httpd_uri_t network_legacy = {.uri="/api/admin/network",.method=HTTP_GET,.handler=network_status_get};
+    httpd_uri_t network_status = {.uri="/api/network/status",.method=HTTP_GET,.handler=network_status_get};
+    httpd_uri_t network_scan = {.uri="/api/network/scan",.method=HTTP_GET,.handler=network_scan_get};
+    httpd_uri_t network_connect = {.uri="/api/network/connect",.method=HTTP_POST,.handler=network_connect_post};
+    httpd_uri_t network_disconnect = {.uri="/api/network/disconnect",.method=HTTP_POST,.handler=network_disconnect_post};
+    httpd_uri_t network_reconnect = {.uri="/api/network/reconnect",.method=HTTP_POST,.handler=network_reconnect_post};
+    httpd_uri_t network_forget = {.uri="/api/network/forget",.method=HTTP_POST,.handler=network_forget_post};
+    httpd_uri_t network_ap = {.uri="/api/network/ap",.method=HTTP_POST,.handler=network_ap_post};
     httpd_uri_t files_get = {.uri="/api/files",.method=HTTP_GET,.handler=files_list_get};
     httpd_uri_t files_post = {.uri="/api/files",.method=HTTP_POST,.handler=file_upload_post};
     httpd_uri_t files_delete = {.uri="/api/files",.method=HTTP_DELETE,.handler=file_delete};
@@ -326,7 +459,14 @@ void prisma_admin_register(httpd_handle_t server)
     httpd_register_uri_handler(server, &admin);
     httpd_register_uri_handler(server, &css);
     httpd_register_uri_handler(server, &overview);
-    httpd_register_uri_handler(server, &network);
+    httpd_register_uri_handler(server, &network_legacy);
+    httpd_register_uri_handler(server, &network_status);
+    httpd_register_uri_handler(server, &network_scan);
+    httpd_register_uri_handler(server, &network_connect);
+    httpd_register_uri_handler(server, &network_disconnect);
+    httpd_register_uri_handler(server, &network_reconnect);
+    httpd_register_uri_handler(server, &network_forget);
+    httpd_register_uri_handler(server, &network_ap);
     httpd_register_uri_handler(server, &files_get);
     httpd_register_uri_handler(server, &files_post);
     httpd_register_uri_handler(server, &files_delete);
