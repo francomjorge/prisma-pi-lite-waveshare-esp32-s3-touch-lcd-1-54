@@ -5,4 +5,6 @@ idf_component_register(
     EMBED_TXTFILES "web/admin.html" "web/admin.css"
 )
 
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error=format-truncation)
+
 spiffs_create_partition_image(storage ../storage FLASH_IN_PROJECT)
