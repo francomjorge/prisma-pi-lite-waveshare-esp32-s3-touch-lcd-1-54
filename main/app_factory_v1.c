@@ -27,6 +27,7 @@
 #define LCD_PIN_BL 46
 
 #define PAGE_COUNT 1
+#define SWIPE_THRESHOLD 55
 #define HOME_COOLDOWN_TICKS 25
 
 static const char *TAG = "FACTORY_V1";
@@ -185,17 +186,21 @@ void app_main(void)
             miss = 0;
             if (!down) {
                 startx=x; starty=y; down=true;
-            } else if ((int)startx-(int)x > 55 && page < PAGE_COUNT-1) {
-                page++;
-                glitch_count=0;
-                draw_page(page,phase);
-                down=false;
-            } else if ((int)x-(int)startx > 55 && page > 0) {
-                page--;
-                glitch_count=0;
-                if (page==0) home_cooldown=HOME_COOLDOWN_TICKS;
-                draw_page(page,phase);
-                down=false;
+            } else {
+                int dx = (int)x - (int)startx;
+                if (dx < -SWIPE_THRESHOLD) {
+                    if (page < PAGE_COUNT-1) page++;
+                    glitch_count=0;
+                    draw_page(page,phase);
+                    home_cooldown=HOME_COOLDOWN_TICKS;
+                    down=false;
+                } else if (dx > SWIPE_THRESHOLD) {
+                    if (page > 0) page--;
+                    glitch_count=0;
+                    draw_page(page,phase);
+                    home_cooldown=HOME_COOLDOWN_TICKS;
+                    down=false;
+                }
             }
         } else if (down && ++miss > 4) {
             if (page==0 && home_cooldown==0) glitch(startx,starty);
