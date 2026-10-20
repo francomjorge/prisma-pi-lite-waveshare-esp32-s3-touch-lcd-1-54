@@ -20,7 +20,7 @@ assert '"saved_volume":%d' in api
 assert "prisma_audio_preview_volume(volume)" in api
 assert 'strcmp(save,"0")!=0' in api
 assert "save must be 0 or 1" in api
-assert "oninput=\\"onVolumeInput()\\" onchange=\\"saveVolume()\\" " in html
+assert 'oninput="onVolumeInput()" onchange="saveVolume()" ' in html
 assert "savedVolumeValue" in html
 assert "setVolumePreset(15)" in html and "setVolumePreset(60)" in html
 assert "SAVE VOLUME" in html
