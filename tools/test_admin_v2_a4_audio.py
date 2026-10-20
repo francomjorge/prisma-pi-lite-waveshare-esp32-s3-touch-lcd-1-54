@@ -23,6 +23,16 @@ assert '440.0f' in audio
 assert 'WAV must be PCM' in audio
 assert 'prisma_audio_init(bus)' in touch
 
+# esp_codec_dev constants are shifted/8-bit addresses (ES8311=0x30,
+# ES7210=0x80), while ESP-IDF i2c_master_probe() requires 7-bit addresses.
+# The hardware probe must therefore use >>1, but the codec control adapter
+# must keep ES8311_CODEC_DEFAULT_ADDR unchanged.
+assert '#define ES8311_PROBE_ADDR ((uint16_t)(ES8311_CODEC_DEFAULT_ADDR >> 1))' in audio
+assert '#define ES7210_PROBE_ADDR ((uint16_t)(ES7210_CODEC_DEFAULT_ADDR >> 1))' in audio
+assert 'i2c_master_probe(i2c_bus, ES8311_PROBE_ADDR' in audio
+assert 'i2c_master_probe(i2c_bus, ES7210_PROBE_ADDR' in audio
+assert '.addr = ES8311_CODEC_DEFAULT_ADDR' in audio
+
 for uri in ['/api/audio/status','/api/audio/volume','/api/audio/tone','/api/audio/play','/api/audio/stop']:
     assert uri in api
 assert 'require_auth' in api
@@ -36,4 +46,4 @@ assert 'A4 AUDIO' in html
 assert 'A5 BLE' in html
 assert 'SYSTEM CORE' in html
 
-print('Admin V2 A4 AUDIO OK: official pin map, codec status, volume, tone, selected WAV playback, physical UI frozen')
+print('Admin V2 A4 AUDIO OK: official pin map, 7-bit codec probes, volume, tone, selected WAV playback, physical UI frozen')
