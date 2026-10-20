@@ -7,27 +7,47 @@
 <link rel="stylesheet" href="/admin.css">
 </head>
 <body>
-<header><div><b>PRISMA<span>-PI</span></b><small>LITE / FACTORY V1</small></div><div id="netTop">192.168.4.1</div></header>
+<header><div><b>PRISMA<span>-PI</span></b><small>LITE / FACTORY V1.1</small></div><div id="netTop">192.168.4.1</div></header>
 <main>
-<section class="hero"><div class="eyebrow">FACTORY CORE</div><h1>Ready for nanoPAD</h1><p>Base limpia: appliance, power, Wi-Fi y sistema de archivos. Sin pedal ni efectos.</p></section>
+<section class="hero"><div class="eyebrow">FACTORY CORE</div><h1>Ready for nanoPAD</h1><p>Base limpia del appliance con administración, archivos y detección USB MIDI.</p></section>
+<nav class="tabs"><button class="tabBtn active" data-tab="core" onclick="showTab('core')">CORE</button><button class="tabBtn" data-tab="midi" onclick="showTab('midi')">MIDI</button></nav>
+
+<section id="tab-core" class="tabPane active">
 <div class="grid">
 <section class="card"><h2>System</h2><div class="kv"><label>Version</label><strong id="version">--</strong><label>Uptime</label><strong id="uptime">--</strong><label>Free heap</label><strong id="heap">--</strong><label>Flash</label><strong id="flash">--</strong><label>PSRAM</label><strong id="psram">--</strong><label>Temperature</label><strong id="temp">--</strong><label>Last reset</label><strong id="reset">--</strong></div><button onclick="loadSystem()">REFRESH</button></section>
 <section class="card"><h2>Wi-Fi</h2><div class="kv"><label>SSID</label><strong id="ssid">--</strong><label>IP</label><strong id="ip">--</strong><label>Channel</label><strong id="channel">--</strong><label>Clients</label><strong id="clients">--</strong></div><button onclick="loadNetwork()">REFRESH</button></section>
 <section class="card wide"><div class="filesHead"><div><h2>Files</h2><p>Hasta 4 archivos. WAV, imágenes, JSON, BIN o cualquier otro formato.</p></div><div><strong id="fileCount">0 / 4</strong><small id="storage">--</small></div></div><div class="upload"><input id="picker" type="file"><button id="uploadBtn" onclick="uploadFile()">UPLOAD</button></div><div id="progress" class="status"></div><div id="files" class="fileList"></div><button onclick="loadFiles()">REFRESH FILES</button></section>
 </div>
+</section>
+
+<section id="tab-midi" class="tabPane">
+<div class="grid midiGrid">
+<section class="card midiStatusCard"><div class="eyebrow">USB MIDI HOST</div><div id="midiState" class="bigState disconnected">DISCONNECTED</div><div id="midiSub" class="stateSub">Waiting for controller</div><div class="kv midiKv"><label>Host stack</label><strong id="hostReady">--</strong><label>USB device</label><strong id="usbPresent">--</strong><label>VID:PID</label><strong id="vidpid">----:----</strong></div><button onclick="loadMidi()">REFRESH</button></section>
+<section class="card"><h2>Sound trigger</h2><p class="lead">Dejamos guardado si el futuro evento MIDI debe reproducir sonido y qué archivo usar.</p><label class="switchRow"><span>Play sound on MIDI event</span><input id="playSound" type="checkbox"></label><label class="fieldLabel" for="soundFile">Selected sound</label><select id="soundFile"><option value="">No sound selected</option></select><div id="soundHint" class="hint">Subí un WAV desde CORE / Files y aparecerá acá.</div><div class="buttonRow"><button onclick="saveMidiConfig()">SAVE MIDI CONFIG</button></div><div id="midiSaveStatus" class="status"></div></section>
+<section class="card wide"><h2>Stage V1.1</h2><div class="stageList"><div><b>01</b><span>Detect USB device connect/disconnect</span></div><div><b>02</b><span>Confirm whether the attached device exposes USB MIDI</span></div><div><b>03</b><span>Persist sound ON/OFF and selected file</span></div><div><b>04</b><span>Playback engine remains intentionally disabled in this stage</span></div></div></section>
+</div>
+</section>
 </main>
 <script>
 const $=id=>document.getElementById(id);
 const fmt=n=>{n=Number(n)||0;if(n>=1048576)return (n/1048576).toFixed(2)+' MiB';if(n>=1024)return (n/1024).toFixed(1)+' KiB';return n+' B'};
 const uptime=ms=>{let s=Math.floor((Number(ms)||0)/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60);return h+'h '+m+'m'};
+const hex4=n=>(Number(n)||0).toString(16).toUpperCase().padStart(4,'0');
+let currentFiles=[];
+let currentMidi=null;
 async function json(url,opt){const r=await fetch(url,opt);if(!r.ok)throw new Error((await r.text())||r.statusText);return r.json()}
+function showTab(name){document.querySelectorAll('.tabPane').forEach(x=>x.classList.toggle('active',x.id==='tab-'+name));document.querySelectorAll('.tabBtn').forEach(x=>x.classList.toggle('active',x.dataset.tab===name));if(name==='midi')loadMidi()}
 async function loadSystem(){try{const s=await json('/api/admin/overview?x='+Date.now());$('version').textContent=s.version;$('uptime').textContent=uptime(s.uptime_ms);$('heap').textContent=fmt(s.heap_free);$('flash').textContent=fmt(s.flash_bytes);$('psram').textContent=fmt(s.psram_bytes);$('temp').textContent=s.chip_temp.present?s.chip_temp.c.toFixed(1)+' C':'N/A';$('reset').textContent=s.reset_reason}catch(e){$('version').textContent='ERROR'}}
 async function loadNetwork(){try{const n=await json('/api/admin/network?x='+Date.now());$('ssid').textContent=n.ssid;$('ip').textContent=n.ip;$('netTop').textContent=n.ip;$('channel').textContent=n.channel;$('clients').textContent=n.client_count+' / '+n.max_clients}catch(e){$('ssid').textContent='ERROR'}}
 function fileRow(f){const e=document.createElement('div');e.className='fileRow';const meta=document.createElement('div');meta.innerHTML='<b></b><small></small>';meta.querySelector('b').textContent=f.name;meta.querySelector('small').textContent=fmt(f.size);const a=document.createElement('a');a.textContent='DOWNLOAD';a.href='/files/'+encodeURIComponent(f.name);const d=document.createElement('button');d.textContent='DELETE';d.className='danger';d.onclick=()=>deleteFile(f.name);const actions=document.createElement('div');actions.className='actions';actions.append(a,d);e.append(meta,actions);return e}
-async function loadFiles(){try{const s=await json('/api/files?x='+Date.now());$('fileCount').textContent=s.files.length+' / '+s.max_files;$('storage').textContent=fmt(s.free)+' free of '+fmt(s.total);const box=$('files');box.innerHTML='';if(!s.files.length){box.innerHTML='<div class="empty">No user files. Upload the first sample or image.</div>'}else s.files.forEach(f=>box.appendChild(fileRow(f)))}catch(e){$('files').textContent='Storage error: '+e.message}}
-async function uploadFile(){const f=$('picker').files[0];if(!f)return;$('progress').textContent='Uploading '+f.name+'...';$('uploadBtn').disabled=true;try{await json('/api/files?name='+encodeURIComponent(f.name),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:f});$('progress').textContent='Uploaded.';$('picker').value='';await loadFiles()}catch(e){$('progress').textContent='Upload failed: '+e.message}finally{$('uploadBtn').disabled=false}}
-async function deleteFile(name){if(!confirm('Delete '+name+'?'))return;try{await json('/api/files?name='+encodeURIComponent(name),{method:'DELETE'});await loadFiles()}catch(e){alert(e.message)}}
-loadSystem();loadNetwork();loadFiles();
+function refreshSoundSelect(){const sel=$('soundFile');const wanted=currentMidi?currentMidi.sound_file:sel.value;sel.innerHTML='<option value="">No sound selected</option>';currentFiles.filter(f=>/\.wav$/i.test(f.name)).forEach(f=>{const o=document.createElement('option');o.value=f.name;o.textContent=f.name+' · '+fmt(f.size);sel.appendChild(o)});sel.value=wanted||'';$('soundHint').textContent=currentFiles.some(f=>/\.wav$/i.test(f.name))?'Only WAV files are shown here. Other uploaded files remain available in CORE / Files.':'No WAV files uploaded yet. Upload one in CORE / Files.'}
+async function loadFiles(){try{const s=await json('/api/files?x='+Date.now());currentFiles=s.files||[];$('fileCount').textContent=currentFiles.length+' / '+s.max_files;$('storage').textContent=fmt(s.free)+' free of '+fmt(s.total);const box=$('files');box.innerHTML='';if(!currentFiles.length){box.innerHTML='<div class="empty">No user files. Upload the first sample or image.</div>'}else currentFiles.forEach(f=>box.appendChild(fileRow(f)));refreshSoundSelect()}catch(e){$('files').textContent='Storage error: '+e.message}}
+async function uploadFile(){const f=$('picker').files[0];if(!f)return;$('progress').textContent='Uploading '+f.name+'...';$('uploadBtn').disabled=true;try{await json('/api/files?name='+encodeURIComponent(f.name),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:f});$('progress').textContent='Uploaded.';$('picker').value='';await loadFiles();await loadMidi()}catch(e){$('progress').textContent='Upload failed: '+e.message}finally{$('uploadBtn').disabled=false}}
+async function deleteFile(name){if(!confirm('Delete '+name+'?'))return;try{await json('/api/files?name='+encodeURIComponent(name),{method:'DELETE'});await loadFiles();await loadMidi()}catch(e){alert(e.message)}}
+function paintMidi(s){currentMidi=s;const state=$('midiState');state.className='bigState';if(!s.host_ready){state.textContent='HOST STARTING';state.classList.add('pending');$('midiSub').textContent='USB host stack is starting'}else if(s.midi_connected){state.textContent='CONNECTED';state.classList.add('connected');$('midiSub').textContent='USB MIDI controller detected'}else if(s.usb_present){state.textContent='NOT MIDI';state.classList.add('warning');$('midiSub').textContent='USB device detected, but no MIDI streaming interface'}else{state.textContent='DISCONNECTED';state.classList.add('disconnected');$('midiSub').textContent='Waiting for MIDI controller'}$('hostReady').textContent=s.host_ready?'READY':'WAIT';$('usbPresent').textContent=s.usb_present?'YES':'NO';$('vidpid').textContent=s.usb_present?hex4(s.vid)+':'+hex4(s.pid):'----:----';$('playSound').checked=!!s.play_sound;refreshSoundSelect();if(s.sound_file&&!s.selected_file_present)$('soundHint').textContent='Selected file is missing. Choose another WAV and save.'}
+async function loadMidi(){try{paintMidi(await json('/api/midi/status?x='+Date.now()))}catch(e){$('midiState').textContent='STATUS ERROR'}}
+async function saveMidiConfig(){const play=$('playSound').checked;const file=$('soundFile').value;$('midiSaveStatus').textContent='Saving...';try{await json('/api/midi/config?play='+(play?'1':'0')+'&file='+encodeURIComponent(file),{method:'POST'});$('midiSaveStatus').textContent='Saved.';await loadMidi()}catch(e){$('midiSaveStatus').textContent='Save failed: '+e.message}}
+loadSystem();loadNetwork();loadFiles().then(loadMidi);setInterval(()=>{if($('tab-midi').classList.contains('active'))loadMidi()},1000);
 </script>
 </body>
 </html>
