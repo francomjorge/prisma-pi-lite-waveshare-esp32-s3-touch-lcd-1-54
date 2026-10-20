@@ -5,6 +5,7 @@
 
 #include "admin_api.h"
 #include "network_service.h"
+#include "security_service.h"
 
 static const char *TAG = "ADMIN_WIFI";
 
@@ -23,11 +24,17 @@ void prisma_wifi_start(void)
         return;
     }
 
+    esp_err_t sec = prisma_security_init();
+    if (sec != ESP_OK) {
+        ESP_LOGE(TAG, "security init failed: %s", esp_err_to_name(sec));
+        return;
+    }
+
     httpd_config_t hc = HTTPD_DEFAULT_CONFIG();
     hc.uri_match_fn = httpd_uri_match_wildcard;
     hc.lru_purge_enable = true;
-    hc.max_uri_handlers = 24;
-    hc.stack_size = 10240;
+    hc.max_uri_handlers = 32;
+    hc.stack_size = 12288;
 
     httpd_handle_t server = NULL;
     if (httpd_start(&server, &hc) == ESP_OK) {
