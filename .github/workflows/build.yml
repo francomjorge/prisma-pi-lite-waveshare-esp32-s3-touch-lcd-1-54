@@ -2,7 +2,7 @@ name: ESP-IDF build
 
 on:
   push:
-    branches: [main, m4.3-consolidated, m4.3-web4-readonly, m4.4-page2-bidirectional, m4.5-unified-build58-sync, m4.6-page2-build58-readonly, m4.7-page2-direct-readonly, m4.8-sync-lab, m4.9-global-web-sync, m4.10-clean-assets, m4.11-correct-assets-ci, m4.11-controller-stable, v5.0-no-effect-no-admin, v1.0-stable-power, v1.0-web-keyboard-nav, v1.0-liveview-rotate-key, v1.1-admin-readonly, v1.1-admin-official-telemetry, v0-fxlab-page5, v0-fxlab-rotate, v0-fxengine-infra, v0-fxengine-pixel-v1, v0-fxengine-glitch-v1-fullscreen, v0-fxengine-allfx-v1, v0-checkpoint-a-six-pages-motion, nanopad-v1-infra-home, admin-v2-a1-network, admin-v2-a2-security, admin-v2-a3-filesplus, admin-v2-a4-audio, admin-v2-a4-audio-hotfix]
+    branches: [main, m4.3-consolidated, m4.3-web4-readonly, m4.4-page2-bidirectional, m4.5-unified-build58-sync, m4.6-page2-build58-readonly, m4.7-page2-direct-readonly, m4.8-sync-lab, m4.9-global-web-sync, m4.10-clean-assets, m4.11-correct-assets-ci, m4.11-controller-stable, v5.0-no-effect-no-admin, v1.0-stable-power, v1.0-web-keyboard-nav, v1.0-liveview-rotate-key, v1.1-admin-readonly, v1.1-admin-official-telemetry, v0-fxlab-page5, v0-fxlab-rotate, v0-fxengine-infra, v0-fxengine-pixel-v1, v0-fxengine-glitch-v1-fullscreen, v0-fxengine-allfx-v1, v0-checkpoint-a-six-pages-motion, nanopad-v1-infra-home, admin-v2-a1-network, admin-v2-a2-security, admin-v2-a3-filesplus, admin-v2-a4-audio, admin-v2-a4-audio-hotfix, admin-v2-a4-1-volume]
   workflow_dispatch:
 
 jobs:
@@ -32,12 +32,16 @@ jobs:
         if: github.ref_name == 'admin-v2-a4-audio' || github.ref_name == 'admin-v2-a4-audio-hotfix'
         run: python3 tools/test_admin_v2_a4_audio.py
 
+      - name: Validate Admin V2 A4.1 Volume
+        if: github.ref_name == 'admin-v2-a4-1-volume'
+        run: python3 tools/test_admin_v2_a4_1_volume.py
+
       - name: Validate checkpoint A
-        if: github.ref_name != 'nanopad-v1-infra-home' && github.ref_name != 'admin-v2-a1-network' && github.ref_name != 'admin-v2-a2-security' && github.ref_name != 'admin-v2-a3-filesplus' && github.ref_name != 'admin-v2-a4-audio' && github.ref_name != 'admin-v2-a4-audio-hotfix'
+        if: github.ref_name != 'nanopad-v1-infra-home' && github.ref_name != 'admin-v2-a1-network' && github.ref_name != 'admin-v2-a2-security' && github.ref_name != 'admin-v2-a3-filesplus' && github.ref_name != 'admin-v2-a4-audio' && github.ref_name != 'admin-v2-a4-audio-hotfix' && github.ref_name != 'admin-v2-a4-1-volume'
         run: python3 tools/test_checkpoint_a.py
 
       - name: Validate legacy admin
-        if: github.ref_name != 'nanopad-v1-infra-home' && github.ref_name != 'admin-v2-a1-network' && github.ref_name != 'admin-v2-a2-security' && github.ref_name != 'admin-v2-a3-filesplus' && github.ref_name != 'admin-v2-a4-audio' && github.ref_name != 'admin-v2-a4-audio-hotfix'
+        if: github.ref_name != 'nanopad-v1-infra-home' && github.ref_name != 'admin-v2-a1-network' && github.ref_name != 'admin-v2-a2-security' && github.ref_name != 'admin-v2-a3-filesplus' && github.ref_name != 'admin-v2-a4-audio' && github.ref_name != 'admin-v2-a4-audio-hotfix' && github.ref_name != 'admin-v2-a4-1-volume'
         run: python3 tools/test_admin_readonly.py
 
       - name: Install ESP-IDF v5.5.1
@@ -89,6 +93,39 @@ jobs:
           idf.py merge-bin -o prisma-pi-lite-admin-v2-a4-audio-hotfix.bin -f raw
           test -f build/prisma-pi-lite-admin-v2-a4-audio-hotfix.bin
 
+      - name: Build Admin V2 A4.1 volume single BIN
+        if: success() && github.ref_name == 'admin-v2-a4-1-volume'
+        run: |
+          idf.py merge-bin -o prisma-pi-lite-admin-v2-a4-1-volume.bin -f raw
+          test -f prisma-pi-lite-admin-v2-a4-1-volume.bin
+
+      - name: Package A4.1 volume upgrade preserving files and NVS
+        if: success() && github.ref_name == 'admin-v2-a4-1-volume'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/upgrade
+          cp build/bootloader/bootloader.bin dist/upgrade/bootloader.bin
+          cp build/partition_table/partition-table.bin dist/upgrade/partition-table.bin
+          app_bin="$(find build -maxdepth 1 -type f -name '*.bin' -print -quit)"
+          test -n "$app_bin"
+          cp "$app_bin" dist/upgrade/prisma-pi-lite-admin-v2-a4-1-volume-app.bin
+          cat > dist/upgrade/FLASH.txt <<'EOF'
+          PRISMA-PI LITE ADMIN V2 A4.1 - VOLUME CONTROL UPGRADE
+
+          This upgrade is designed to preserve the existing NVS and /storage data.
+          Do NOT run erase_flash.
+          Do NOT flash storage.bin.
+          The partition layout is unchanged from the A4 Audio Hotfix baseline.
+
+          From this directory, run:
+          python -m esptool --chip esp32s3 --baud 460800 write_flash 0x0 bootloader.bin 0x8000 partition-table.bin 0x10000 prisma-pi-lite-admin-v2-a4-1-volume-app.bin
+
+          If the partition layout was modified outside this branch, stop and verify it before flashing.
+          EOF
+          (cd dist/upgrade && zip -q -j ../../prisma-pi-lite-admin-v2-a4-1-volume-upgrade-preserve-files.zip bootloader.bin partition-table.bin prisma-pi-lite-admin-v2-a4-1-volume-app.bin FLASH.txt)
+          sha256sum prisma-pi-lite-admin-v2-a4-1-volume.bin prisma-pi-lite-admin-v2-a4-1-volume-upgrade-preserve-files.zip > SHA256SUMS-A4.1.txt
+
       - name: Upload firmware build
         if: success()
         uses: actions/upload-artifact@v4
@@ -101,6 +138,9 @@ jobs:
             build/partition_table/*.bin
             build/flash_args
             build/flasher_args.json
+            prisma-pi-lite-admin-v2-a4-1-volume.bin
+            prisma-pi-lite-admin-v2-a4-1-volume-upgrade-preserve-files.zip
+            SHA256SUMS-A4.1.txt
 
       - name: Upload build log
         if: always()
