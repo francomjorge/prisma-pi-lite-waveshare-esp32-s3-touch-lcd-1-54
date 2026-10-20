@@ -14,6 +14,8 @@ static const char *TAG = "PRISMA_STORAGE";
 static char sources[PRISMA_MAX_SOURCES][PRISMA_SOURCE_NAME_MAX + 1];
 static int source_count = 0;
 static int source_index = 0;
+static char media_slots[PRISMA_STORAGE_SLOT_COUNT][PRISMA_SOURCE_NAME_MAX + 1];
+static bool media_slot_present[PRISMA_STORAGE_SLOT_COUNT];
 
 static bool source_is_jpeg(const char *name){
     const char *dot = strrchr(name, '.');
@@ -30,6 +32,23 @@ static void sort_sources(void){
                 strlcpy(sources[j], tmp, sizeof(sources[j]));
             }
         }
+    }
+}
+
+static void build_media_slots(void)
+{
+    memset(media_slots, 0, sizeof(media_slots));
+    memset(media_slot_present, 0, sizeof(media_slot_present));
+
+    int fill = source_count < PRISMA_STORAGE_SLOT_COUNT ? source_count : PRISMA_STORAGE_SLOT_COUNT;
+    for(int i=0;i<fill;i++) {
+        strlcpy(media_slots[i], sources[i], sizeof(media_slots[i]));
+        media_slot_present[i] = true;
+    }
+
+    for(int i=0;i<PRISMA_STORAGE_SLOT_COUNT;i++) {
+        ESP_LOGI(TAG, "MEDIA SLOT %d: %s", i + 1,
+                 media_slot_present[i] ? media_slots[i] : "<EMPTY>");
     }
 }
 
@@ -57,10 +76,24 @@ void prisma_storage_init(void){
     }
     closedir(dir);
     sort_sources();
+    build_media_slots();
     for(int i=0;i<source_count;i++) if(!strcasecmp(sources[i], "F1_MOON.JPG")){source_index = i;break;}
-    ESP_LOGI(TAG, "SOURCE COUNT=%d", source_count);
+    ESP_LOGI(TAG, "SOURCE COUNT=%d; LOGICAL MEDIA SLOTS=%d", source_count, PRISMA_STORAGE_SLOT_COUNT);
 }
 
 int prisma_storage_count(void){return source_count;}
 const char *prisma_storage_current(void){if(source_count <= 0) return "F1_MOON.JPG";return sources[source_index];}
 const char *prisma_storage_next(void){if(source_count <= 0) return "F1_MOON.JPG";source_index = (source_index + 1) % source_count;ESP_LOGI(TAG, "SOURCE -> %s", sources[source_index]);return sources[source_index];}
+
+int prisma_storage_slot_count(void){return PRISMA_STORAGE_SLOT_COUNT;}
+
+bool prisma_storage_slot_present(int slot)
+{
+    return slot >= 0 && slot < PRISMA_STORAGE_SLOT_COUNT && media_slot_present[slot];
+}
+
+const char *prisma_storage_slot_name(int slot)
+{
+    if(slot < 0 || slot >= PRISMA_STORAGE_SLOT_COUNT || !media_slot_present[slot]) return "";
+    return media_slots[slot];
+}
