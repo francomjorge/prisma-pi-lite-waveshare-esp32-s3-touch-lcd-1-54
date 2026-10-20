@@ -1,5 +1,6 @@
 #include "audio_api.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -73,31 +74,42 @@ static esp_err_t status_get(httpd_req_t *r)
     char b[900];
     snprintf(b,sizeof(b),
         "{\"initialized\":%s,\"es8311\":%s,\"es7210\":%s,\"playing\":%s,\"tone\":%s,"
-        "\"volume\":%d,\"selected_sample\":\"%s\",\"playing_name\":\"%s\","
+        "\"volume\":%d,\"saved_volume\":%d,\"selected_sample\":\"%s\",\"playing_name\":\"%s\","
         "\"source_rate\":%d,\"source_channels\":%d,\"source_bits\":%d,"
         "\"position_ms\":%d,\"duration_ms\":%d,\"last_error\":\"%s\","
         "\"output_rate\":16000,\"output_bits\":16,\"output_channels\":1}",
         s.initialized?"true":"false",s.es8311_present?"true":"false",s.es7210_present?"true":"false",
-        s.playing?"true":"false",s.tone?"true":"false",s.volume,selected,playing,
+        s.playing?"true":"false",s.tone?"true":"false",s.volume,s.saved_volume,selected,playing,
         s.source_rate,s.source_channels,s.source_bits,s.position_ms,s.duration_ms,err);
     httpd_resp_set_type(r,"application/json");no_cache(r);return httpd_resp_sendstr(r,b);
 }
 
-static bool form_value(httpd_req_t *r,const char *key,char *out,size_t cap)
+static bool volume_form(httpd_req_t *r,char *volume,size_t volume_cap,char *save,size_t save_cap)
 {
     if(r->content_len<=0||r->content_len>255)return false;
     char body[256];int left=r->content_len,pos=0;
     while(left>0){int n=httpd_req_recv(r,body+pos,left);if(n==HTTPD_SOCK_ERR_TIMEOUT)continue;if(n<=0)return false;pos+=n;left-=n;}body[pos]=0;
-    return httpd_query_key_value(body,key,out,cap)==ESP_OK;
+    if(httpd_query_key_value(body,"volume",volume,volume_cap)!=ESP_OK)return false;
+    if(httpd_query_key_value(body,"save",save,save_cap)!=ESP_OK)strlcpy(save,"1",save_cap);
+    return true;
 }
 
 static esp_err_t volume_post(httpd_req_t *r)
 {
     if(require_auth(r)!=ESP_OK)return ESP_OK;
-    char v[16]; if(!form_value(r,"volume",v,sizeof(v)))return httpd_resp_send_err(r,400,"volume required");
-    int volume=atoi(v); esp_err_t e=prisma_audio_set_volume(volume);
+    char v[16],save[8];
+    if(!volume_form(r,v,sizeof(v),save,sizeof(save)))return httpd_resp_send_err(r,400,"volume required");
+    char *end=NULL;
+    long parsed=strtol(v,&end,10);
+    if(end==v||*end||parsed<0||parsed>100)return httpd_resp_send_err(r,400,"volume must be 0-100");
+    if(strcmp(save,"0")&&strcmp(save,"1"))return httpd_resp_send_err(r,400,"save must be 0 or 1");
+    int volume=(int)parsed;
+    bool persist=strcmp(save,"0")!=0;
+    esp_err_t e=persist?prisma_audio_set_volume(volume):prisma_audio_preview_volume(volume);
     if(e!=ESP_OK)return httpd_resp_send_err(r,400,"volume must be 0-100 and audio must be ready");
-    httpd_resp_set_type(r,"application/json");no_cache(r);return httpd_resp_sendstr(r,"{\"ok\":true}");
+    char response[96];
+    snprintf(response,sizeof(response),"{\"ok\":true,\"volume\":%d,\"saved\":%s}",volume,persist?"true":"false");
+    httpd_resp_set_type(r,"application/json");no_cache(r);return httpd_resp_sendstr(r,response);
 }
 
 static esp_err_t tone_post(httpd_req_t *r)
