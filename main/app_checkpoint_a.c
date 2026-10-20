@@ -19,12 +19,17 @@
 #undef mode_index
 #undef synth_on
 
-#define CP_PAGE_COUNT 6
+/*
+ * nanoPAD V1 exposes only the original PRISMA-PI LITE home page.
+ * The page router/swipe model stays active so V2/V3 can be added by
+ * incrementing this count and wiring the next page in cp_draw_page().
+ */
+#define CP_PAGE_COUNT 1
 #define MOTION_COUNT 6
 #define MOTION_BAR_X 110
 #define MOTION_BAR_W 84
 
-static const char *SYNC_TAG = "WEB_SYNC";
+static const char *SYNC_TAG = "NANOPAD_V1";
 static bool motion_enabled[MOTION_COUNT] = {false,false,false,false,false,false};
 static int motion_value[MOTION_COUNT] = {50,50,50,50,50,50};
 static const char *motion_names[MOTION_COUNT] = {"PULSE","DRIFT","ROTATE","WAVE","SHAKE","FEEDBACK"};
@@ -40,8 +45,11 @@ int prisma_appliance_get_motion_value(int effect){if(effect<0||effect>=MOTION_CO
 
 static void cp_dots(int page, uint16_t cyan, uint16_t dim)
 {
-    int xs[6]={76,92,108,124,140,156};
-    for(int i=0;i<CP_PAGE_COUNT;i++) rect(xs[i],224,8,8,i==page?cyan:dim);
+    const int dot_w = 8;
+    const int gap = 8;
+    const int total_w = CP_PAGE_COUNT * dot_w + (CP_PAGE_COUNT - 1) * gap;
+    const int start_x = (W - total_w) / 2;
+    for(int i=0;i<CP_PAGE_COUNT;i++) rect(start_x+i*(dot_w+gap),224,dot_w,dot_w,i==page?cyan:dim);
 }
 
 static void cp_page_intro(int phase)
@@ -50,18 +58,19 @@ static void cp_page_intro(int phase)
     clear(bg);logo_title(42,phase);text_center(100,"LITE",3,wh);text_center(151,"VIDEO SYNTHESIZER",2,wh);cp_dots(0,cy,dim);show();
 }
 
+/* Retained below as dormant V2/V3 infrastructure and for the existing web mirror. */
 static void cp_page_controls(void)
 {
     uint16_t bg=rgb(4,7,12),wh=rgb(240,245,250),cy=rgb(35,220,220),dim=rgb(45,60,75),disabled=rgb(75,82,90),blue=rgb(25,65,145),green=rgb(35,200,110),red=rgb(230,55,65);
     uint16_t fg=prisma_shared_on?wh:disabled,accent=prisma_shared_on?cy:disabled;clear(bg);
     text(12,10,"PRISMA-PI",2,wh);rect(174,7,54,28,prisma_shared_on?green:red);text_box_center(174,54,14,prisma_shared_on?"ON":"OFF",2,wh);text(12,47,"NOW PLAYING",1,accent);text(12,60,prisma_storage_current(),2,fg);text(12,91,"INTENSITY",2,fg);
-    char pct[8];snprintf(pct,sizeof(pct),"%d",prisma_shared_intensity);text(198,91,pct,2,fg);rect(12,114,216,10,dim);rect(12,114,prisma_shared_on?(216*prisma_shared_intensity/100):0,10,accent);text(12,151,"MODE",2,fg);rect(86,143,142,34,prisma_shared_on?blue:dim);text_box_center(86,142,154,prisma_shared_mode?"BYPASS":"RANDOM",2,fg);cp_dots(1,prisma_shared_on?cy:disabled,dim);show();
+    char pct[8];snprintf(pct,sizeof(pct),"%d",prisma_shared_intensity);text(198,91,pct,2,fg);rect(12,114,216,10,dim);rect(12,114,prisma_shared_on?(216*prisma_shared_intensity/100):0,10,accent);text(12,151,"MODE",2,fg);rect(86,143,142,34,prisma_shared_on?blue:dim);text_box_center(86,142,154,prisma_shared_mode?"BYPASS":"RANDOM",2,fg);cp_dots(0,prisma_shared_on?cy:disabled,dim);show();
 }
 
 static void cp_page_monitor(void)
 {
     uint16_t bg=rgb(4,7,12),wh=rgb(240,245,250),cy=rgb(35,220,220),dim=rgb(45,60,75);
-    clear(bg);text_center(48,"VISUAL MONITOR",2,wh);rect(28,82,184,2,cy);text_center(106,"OPEN IN BROWSER",2,wh);text_center(143,"192.168.4.1",2,cy);cp_dots(2,cy,dim);show();
+    clear(bg);text_center(48,"VISUAL MONITOR",2,wh);rect(28,82,184,2,cy);text_center(106,"OPEN IN BROWSER",2,wh);text_center(143,"192.168.4.1",2,cy);cp_dots(0,cy,dim);show();
 }
 
 static void cp_page_effects(void)
@@ -72,13 +81,13 @@ static void cp_page_effects(void)
         if(i==4){int sy=y-2;rect(FX_BAR_X,sy,48,20,enabled?(prisma_shared_on?green:disabled):dim);text_box_center(FX_BAR_X,48,sy+7,"ON",1,wh);rect(FX_BAR_X+54,sy,48,20,!enabled?(prisma_shared_on?red:disabled):dim);text_box_center(FX_BAR_X+54,48,sy+7,"OFF",1,wh);}
         else{char value[4];snprintf(value,sizeof(value),"%d",effect_value[i]);rect(FX_BAR_X,y+3,FX_BAR_W,8,dim);int fill=FX_BAR_W*effect_value[i]/100;if(fill>0)rect(FX_BAR_X,y+3,fill,8,(prisma_shared_on&&enabled)?cy:disabled);text(FX_VALUE_X,y+3,value,1,label);}
     }
-    cp_dots(3,prisma_shared_on?cy:disabled,dim);show();
+    cp_dots(0,prisma_shared_on?cy:disabled,dim);show();
 }
 
 static void cp_page_fx_lab(void)
 {
     uint16_t bg=rgb(4,7,12),wh=rgb(240,245,250),cy=rgb(35,220,220),dim=rgb(45,60,75);
-    clear(bg);text_center(48,"FX LAB",3,wh);rect(28,82,184,2,cy);text_center(106,"OPEN IN BROWSER",2,wh);text_center(143,"192.168.4.1",2,cy);cp_dots(4,cy,dim);show();
+    clear(bg);text_center(48,"FX LAB",3,wh);rect(28,82,184,2,cy);text_center(106,"OPEN IN BROWSER",2,wh);text_center(143,"192.168.4.1",2,cy);cp_dots(0,cy,dim);show();
 }
 
 static void cp_page_motion(void)
@@ -93,7 +102,7 @@ static void cp_page_motion(void)
         if(fill>0)rect(MOTION_BAR_X,y+3,fill,8,(prisma_shared_on&&enabled)?cy:disabled);
         text(FX_VALUE_X,y+3,value,1,label);
     }
-    cp_dots(5,prisma_shared_on?cy:disabled,dim);show();
+    cp_dots(0,prisma_shared_on?cy:disabled,dim);show();
 }
 
 static void cp_draw_page(int page,int phase)
@@ -112,7 +121,7 @@ void app_main(void)
 {
     prisma_shared_mode=0;prisma_shared_intensity=61;
     prisma_power_init();prisma_storage_init();
-    power_hold();ESP_LOGI(SYNC_TAG,"PRISMA-PI LITE CHECKPOINT A - SIX APPLIANCE PAGES + MOTION STATE");
+    power_hold();ESP_LOGI(SYNC_TAG,"PRISMA-PI LITE NANOPAD V1 - HOME + POWER + STORAGE + WIFI INFRA");
     gpio_config_t bl={.pin_bit_mask=1ULL<<LCD_PIN_BL,.mode=GPIO_MODE_OUTPUT};ESP_ERROR_CHECK(gpio_config(&bl));gpio_set_level(LCD_PIN_BL,0);
     spi_bus_config_t bus={.sclk_io_num=LCD_PIN_SCLK,.mosi_io_num=LCD_PIN_MOSI,.miso_io_num=-1,.quadwp_io_num=-1,.quadhd_io_num=-1,.max_transfer_sz=W*40*2};ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST,&bus,SPI_DMA_CH_AUTO));
     esp_lcd_panel_io_handle_t io=NULL;esp_lcd_panel_io_spi_config_t ioc={.dc_gpio_num=LCD_PIN_DC,.cs_gpio_num=LCD_PIN_CS,.pclk_hz=40000000,.lcd_cmd_bits=8,.lcd_param_bits=8,.spi_mode=0,.trans_queue_depth=10};ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST,&ioc,&io));
