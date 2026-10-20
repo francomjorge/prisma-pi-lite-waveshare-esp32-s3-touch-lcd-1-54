@@ -6,12 +6,13 @@ cmake=(root/'main/CMakeLists.txt').read_text()
 app=(root/'main/app_factory_v1.c').read_text()
 power=(root/'main/prisma_power.c').read_text()
 storage=(root/'main/storage.c').read_text()
-admin=(root/'main/admin_api.c').read_text()
+admin=(root/'main/admin_api_factory.c').read_text()
 html=(root/'main/web/admin.html').read_text()
 parts=(root/'partitions.csv').read_text()
 
 assert '"app_factory_v1.c"' in cmake
 assert '"wifi_portal_factory.c"' in cmake
+assert '"admin_api_factory.c"' in cmake
 assert 'app_checkpoint_a.c' not in cmake
 assert 'wifi_portal_checkpoint_a.c' not in cmake
 assert 'web/index.html' not in cmake
@@ -38,6 +39,7 @@ assert 'HTTP_DELETE' in admin
 assert '.uri="/files/*"' in admin
 assert 'FACTORY_MAX_UPLOAD_BYTES' in admin
 assert 'audio/wav' in admin
+assert '#include <strings.h>' in admin
 
 assert 'Ready for nanoPAD' in html
 assert 'UPLOAD' in html and 'DOWNLOAD' in html and 'DELETE' in html
