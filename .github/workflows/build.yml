@@ -3,7 +3,7 @@ name: ESP-IDF build
 
 on:
   push:
-    branches: [main, m4.3-consolidated, m4.3-web4-readonly, m4.4-page2-bidirectional, m4.5-unified-build58-sync, m4.6-page2-build58-readonly, m4.7-page2-direct-readonly, m4.8-sync-lab, m4.9-global-web-sync, m4.10-clean-assets, m4.11-correct-assets-ci, m4.11-controller-stable, v5.0-no-effect-no-admin, v1.0-stable-power, v1.0-web-keyboard-nav, v1.0-liveview-rotate-key, v1.1-admin-readonly, v1.1-admin-official-telemetry, v0-fxlab-page5, v0-fxlab-rotate, v0-fxengine-infra, v0-fxengine-pixel-v1, v0-fxengine-glitch-v1-fullscreen, v0-fxengine-allfx-v1, v0-checkpoint-a-six-pages-motion]
+    branches: [main, m4.3-consolidated, m4.3-web4-readonly, m4.4-page2-bidirectional, m4.5-unified-build58-sync, m4.6-page2-build58-readonly, m4.7-page2-direct-readonly, m4.8-sync-lab, m4.9-global-web-sync, m4.10-clean-assets, m4.11-correct-assets-ci, m4.11-controller-stable, v5.0-no-effect-no-admin, v1.0-stable-power, v1.0-web-keyboard-nav, v1.0-liveview-rotate-key, v1.1-admin-readonly, v1.1-admin-official-telemetry, v0-fxlab-page5, v0-fxlab-rotate, v0-fxengine-infra, v0-fxengine-pixel-v1, v0-fxengine-glitch-v1-fullscreen, v0-fxengine-allfx-v1, v0-checkpoint-a-six-pages-motion, nanopad-v1-infra-home]
   workflow_dispatch:
 
 jobs:
@@ -14,7 +14,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate checkpoint A
+        if: github.ref_name != 'nanopad-v1-infra-home'
         run: python3 tools/test_checkpoint_a.py
+
+      - name: Validate nanoPAD V1
+        if: github.ref_name == 'nanopad-v1-infra-home'
+        run: python3 tools/test_nanopad_v1.py
 
       - name: Validate read-only admin
         run: python3 tools/test_admin_readonly.py
