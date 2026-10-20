@@ -19,10 +19,11 @@ assert 'web/index.html' not in cmake
 assert 'web/admin.html' in cmake and 'web/admin.css' in cmake
 
 assert '#define PAGE_COUNT 1' in app
+assert '#define SWIPE_THRESHOLD 55' in app
 assert 'PRISMA-PI LITE FACTORY V1' in app
 assert 'glitch(startx,starty)' in app
-assert '(int)startx-(int)x > 55' in app
-assert '(int)x-(int)startx > 55' in app
+assert 'dx < -SWIPE_THRESHOLD' in app and 'dx > SWIPE_THRESHOLD' in app
+assert 'home_cooldown=HOME_COOLDOWN_TICKS' in app
 assert 'SYSTEM CORE' in app
 
 assert '#define POWER_OFF_HOLD_MS 5000' in power
@@ -53,4 +54,4 @@ assert '0x9F0000' in parts
 assert not (root/'storage/F1_MOON.JPG').exists()
 assert not (root/'storage/F1_TANGO.JPG').exists()
 
-print('Factory V1 OK: home+swipe+power+WiFi+generic 4-file storage, no product UI')
+print('Factory V1 OK: home+reserved swipe+power+WiFi+generic 4-file storage, no product UI')
