@@ -11,6 +11,7 @@
 #include "esp_lcd_panel_vendor.h"
 #include "esp_log.h"
 
+#include "midi_service.h"
 #include "prisma_power.h"
 #include "prisma_touch.h"
 #include "storage.h"
@@ -26,11 +27,11 @@
 #define LCD_PIN_RST 40
 #define LCD_PIN_BL 46
 
-#define PAGE_COUNT 1
+#define PAGE_COUNT 2
 #define SWIPE_THRESHOLD 55
 #define HOME_COOLDOWN_TICKS 25
 
-static const char *TAG = "FACTORY_V1";
+static const char *TAG = "FACTORY_V11";
 static uint16_t frame[W * H];
 static esp_lcd_panel_handle_t panel;
 static int glitch_count = 0;
@@ -125,6 +126,53 @@ static void draw_home(int phase)
     show();
 }
 
+static void display_file_name(const char *src, char *dst, size_t dst_size)
+{
+    if (!dst || dst_size == 0) return;
+    size_t j = 0;
+    if (!src) src = "";
+    for (size_t i = 0; src[i] && j + 1 < dst_size && j < 24; i++) {
+        char c = src[i];
+        if (c >= 'a' && c <= 'z') c = (char)(c - 'a' + 'A');
+        if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '-') dst[j++] = c;
+        else if (c == '_' || c == ' ') dst[j++] = '-';
+    }
+    dst[j] = 0;
+}
+
+static void draw_midi(void)
+{
+    uint16_t bg=rgb(4,7,12), wh=rgb(240,245,250), cy=rgb(35,220,220), dim=rgb(45,60,75);
+    uint16_t green=rgb(45,225,120), red=rgb(255,70,90), orange=rgb(255,150,30);
+    prisma_midi_status_t s;
+    prisma_midi_get_status(&s);
+
+    clear(bg);
+    text_center(18, "MIDI CTRL", 3, wh);
+    text_center(49, "USB HOST", 1, s.host_ready ? cy : dim);
+
+    rect(18, 67, 204, 48, rgb(12,19,28));
+    if (s.midi_connected) {
+        text_center(82, "CONNECTED", 2, green);
+    } else if (s.usb_present) {
+        text_center(82, "NOT MIDI", 2, orange);
+    } else {
+        text_center(82, "DISCONNECTED", 2, red);
+    }
+
+    text(24, 132, "SOUND", 2, wh);
+    text(168, 132, s.play_sound ? "ON" : "OFF", 2, s.play_sound ? green : dim);
+
+    text(24, 158, "FILE", 2, wh);
+    char file_name[28];
+    display_file_name(s.sound_file, file_name, sizeof(file_name));
+    if (!file_name[0]) strlcpy(file_name, "NO FILE", sizeof(file_name));
+    text_center(184, file_name, 1, s.selected_file_present ? cy : dim);
+
+    page_dots(1, cy, dim);
+    show();
+}
+
 static void glitch(uint16_t x, uint16_t y)
 {
     uint16_t pal[5] = {rgb(30,120,255),rgb(175,55,255),rgb(255,35,150),rgb(255,120,25),rgb(45,225,120)};
@@ -140,15 +188,15 @@ static void glitch(uint16_t x, uint16_t y)
 
 static void draw_page(int page, int phase)
 {
-    (void)page;
-    draw_home(phase);
+    if (page == 0) draw_home(phase);
+    else draw_midi();
 }
 
 void app_main(void)
 {
     prisma_power_init();
     prisma_storage_init();
-    ESP_LOGI(TAG, "PRISMA-PI LITE FACTORY V1");
+    ESP_LOGI(TAG, "PRISMA-PI LITE FACTORY V1.1 MIDI");
 
     gpio_config_t bl = {.pin_bit_mask=1ULL<<LCD_PIN_BL,.mode=GPIO_MODE_OUTPUT};
     ESP_ERROR_CHECK(gpio_config(&bl));
@@ -173,11 +221,13 @@ void app_main(void)
     bool touch = prisma_touch_init();
     ESP_LOGI(TAG, "TOUCH: %s", touch ? "READY" : "FAILED");
     prisma_wifi_start();
+    prisma_midi_init();
 
     int page = 0;
     uint16_t x=0,y=0,startx=0,starty=0;
     bool down=false;
-    int miss=0,anim=0,home_cooldown=0;
+    int miss=0,anim=0,home_cooldown=0,midi_poll=0;
+    uint32_t midi_revision_seen=0;
 
     while (1) {
         if (home_cooldown > 0) home_cooldown--;
@@ -212,6 +262,16 @@ void app_main(void)
             anim=0;
             phase=(phase+1)%5;
             draw_page(0,phase);
+        }
+
+        if (page==1 && ++midi_poll>=10) {
+            midi_poll=0;
+            prisma_midi_status_t s;
+            prisma_midi_get_status(&s);
+            if (s.revision != midi_revision_seen) {
+                midi_revision_seen = s.revision;
+                draw_midi();
+            }
         }
         vTaskDelay(pdMS_TO_TICKS(20));
     }
