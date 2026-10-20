@@ -39,7 +39,9 @@ jobs:
 
       - name: Build factory single BIN
         if: success() && github.ref_name == 'nanopad-v1-infra-home'
-        run: idf.py merge-bin -o build/prisma-pi-lite-factory-v1.bin -f raw
+        run: |
+          idf.py merge-bin -o prisma-pi-lite-factory-v1.bin -f raw
+          test -f build/prisma-pi-lite-factory-v1.bin
 
       - name: Upload firmware build
         if: success()
