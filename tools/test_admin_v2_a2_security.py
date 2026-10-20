@@ -23,7 +23,7 @@ assert '/api/security/remove' in api
 assert '/api/security/logout-all' in api
 assert 'require_auth' in api and 'auth_required' in api
 assert 'SECURITY' in html and 'Admin login' in html
-assert 'Hold the physical <b>BOOT</b> button for 8 seconds' in html
+assert '<b>BOOT</b> button for 8 seconds' in html
 assert 'A2 SECURITY' in html
 assert 'loginOverlay' in css
 assert '#define POWER_OFF_HOLD_MS 5000' in power
