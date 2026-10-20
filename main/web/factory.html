@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PRISMA-PI LITE / FACTORY</title>
+<link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+<header><div><b>PRISMA<span>-PI</span></b><small>LITE / FACTORY V1</small></div><div id="netTop">192.168.4.1</div></header>
+<main>
+<section class="hero"><div class="eyebrow">FACTORY CORE</div><h1>Ready for nanoPAD</h1><p>Base limpia: appliance, power, Wi-Fi y sistema de archivos. Sin pedal ni efectos.</p></section>
+<div class="grid">
+<section class="card"><h2>System</h2><div class="kv"><label>Version</label><strong id="version">--</strong><label>Uptime</label><strong id="uptime">--</strong><label>Free heap</label><strong id="heap">--</strong><label>Flash</label><strong id="flash">--</strong><label>PSRAM</label><strong id="psram">--</strong><label>Temperature</label><strong id="temp">--</strong><label>Last reset</label><strong id="reset">--</strong></div><button onclick="loadSystem()">REFRESH</button></section>
+<section class="card"><h2>Wi-Fi</h2><div class="kv"><label>SSID</label><strong id="ssid">--</strong><label>IP</label><strong id="ip">--</strong><label>Channel</label><strong id="channel">--</strong><label>Clients</label><strong id="clients">--</strong></div><button onclick="loadNetwork()">REFRESH</button></section>
+<section class="card wide"><div class="filesHead"><div><h2>Files</h2><p>Hasta 4 archivos. WAV, imágenes, JSON, BIN o cualquier otro formato.</p></div><div><strong id="fileCount">0 / 4</strong><small id="storage">--</small></div></div><div class="upload"><input id="picker" type="file"><button id="uploadBtn" onclick="uploadFile()">UPLOAD</button></div><div id="progress" class="status"></div><div id="files" class="fileList"></div><button onclick="loadFiles()">REFRESH FILES</button></section>
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const fmt=n=>{n=Number(n)||0;if(n>=1048576)return (n/1048576).toFixed(2)+' MiB';if(n>=1024)return (n/1024).toFixed(1)+' KiB';return n+' B'};
+const uptime=ms=>{let s=Math.floor((Number(ms)||0)/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60);return h+'h '+m+'m'};
+async function json(url,opt){const r=await fetch(url,opt);if(!r.ok)throw new Error((await r.text())||r.statusText);return r.json()}
+async function loadSystem(){try{const s=await json('/api/admin/overview?x='+Date.now());$('version').textContent=s.version;$('uptime').textContent=uptime(s.uptime_ms);$('heap').textContent=fmt(s.heap_free);$('flash').textContent=fmt(s.flash_bytes);$('psram').textContent=fmt(s.psram_bytes);$('temp').textContent=s.chip_temp.present?s.chip_temp.c.toFixed(1)+' C':'N/A';$('reset').textContent=s.reset_reason}catch(e){$('version').textContent='ERROR'}}
+async function loadNetwork(){try{const n=await json('/api/admin/network?x='+Date.now());$('ssid').textContent=n.ssid;$('ip').textContent=n.ip;$('netTop').textContent=n.ip;$('channel').textContent=n.channel;$('clients').textContent=n.client_count+' / '+n.max_clients}catch(e){$('ssid').textContent='ERROR'}}
+function fileRow(f){const e=document.createElement('div');e.className='fileRow';const meta=document.createElement('div');meta.innerHTML='<b></b><small></small>';meta.querySelector('b').textContent=f.name;meta.querySelector('small').textContent=fmt(f.size);const a=document.createElement('a');a.textContent='DOWNLOAD';a.href='/files/'+encodeURIComponent(f.name);const d=document.createElement('button');d.textContent='DELETE';d.className='danger';d.onclick=()=>deleteFile(f.name);const actions=document.createElement('div');actions.className='actions';actions.append(a,d);e.append(meta,actions);return e}
+async function loadFiles(){try{const s=await json('/api/files?x='+Date.now());$('fileCount').textContent=s.files.length+' / '+s.max_files;$('storage').textContent=fmt(s.free)+' free of '+fmt(s.total);const box=$('files');box.innerHTML='';if(!s.files.length){box.innerHTML='<div class="empty">No user files. Upload the first sample or image.</div>'}else s.files.forEach(f=>box.appendChild(fileRow(f)))}catch(e){$('files').textContent='Storage error: '+e.message}}
+async function uploadFile(){const f=$('picker').files[0];if(!f)return;$('progress').textContent='Uploading '+f.name+'...';$('uploadBtn').disabled=true;try{await json('/api/files?name='+encodeURIComponent(f.name),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:f});$('progress').textContent='Uploaded.';$('picker').value='';await loadFiles()}catch(e){$('progress').textContent='Upload failed: '+e.message}finally{$('uploadBtn').disabled=false}}
+async function deleteFile(name){if(!confirm('Delete '+name+'?'))return;try{await json('/api/files?name='+encodeURIComponent(name),{method:'DELETE'});await loadFiles()}catch(e){alert(e.message)}}
+loadSystem();loadNetwork();loadFiles();
+</script>
+</body>
+</html>
