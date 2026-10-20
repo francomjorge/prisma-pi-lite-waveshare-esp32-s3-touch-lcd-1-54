@@ -102,14 +102,16 @@ static int load_volume(void)
     return (int)v;
 }
 
-static void save_volume(int volume)
+static esp_err_t save_volume(int volume)
 {
     nvs_handle_t h;
-    if (nvs_open(AUDIO_NS, NVS_READWRITE, &h) == ESP_OK) {
-        nvs_set_i32(h, AUDIO_VOLUME, volume);
-        nvs_commit(h);
-        nvs_close(h);
-    }
+    esp_err_t err = nvs_open(AUDIO_NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) return err;
+
+    err = nvs_set_i32(h, AUDIO_VOLUME, volume);
+    if (err == ESP_OK) err = nvs_commit(h);
+    nvs_close(h);
+    return err;
 }
 
 static bool parse_wav(FILE *f, wav_info_t *w)
@@ -311,6 +313,7 @@ esp_err_t prisma_audio_init(i2c_master_bus_handle_t i2c_bus)
     if (!s_lock) return ESP_ERR_NO_MEM;
 
     s_status.volume = load_volume();
+    s_status.saved_volume = s_status.volume;
     load_selected(s_status.selected_sample);
     if (!i2c_bus) {
         set_error("Shared I2C bus unavailable");
@@ -461,16 +464,29 @@ void prisma_audio_get_status(prisma_audio_status_t *out)
     unlock();
 }
 
-esp_err_t prisma_audio_set_volume(int volume)
+esp_err_t prisma_audio_preview_volume(int volume)
 {
     if (volume < 0 || volume > 100) return ESP_ERR_INVALID_ARG;
     if (!s_output) return ESP_ERR_INVALID_STATE;
     if (esp_codec_dev_set_out_vol(s_output, volume) != ESP_CODEC_DEV_OK) {
         return ESP_FAIL;
     }
-    save_volume(volume);
     lock();
     s_status.volume = volume;
+    unlock();
+    return ESP_OK;
+}
+
+esp_err_t prisma_audio_set_volume(int volume)
+{
+    esp_err_t err = prisma_audio_preview_volume(volume);
+    if (err != ESP_OK) return err;
+
+    err = save_volume(volume);
+    if (err != ESP_OK) return err;
+
+    lock();
+    s_status.saved_volume = volume;
     unlock();
     return ESP_OK;
 }
