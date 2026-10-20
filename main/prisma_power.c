@@ -13,7 +13,8 @@
 
 #define POWER_POLL_MS 20
 #define RESTART_HOLD_MS 2000
-#define POWER_OFF_HOLD_MS 3000
+#define POWER_ON_HOLD_MS 3000
+#define POWER_OFF_HOLD_MS 5000
 
 static const char *TAG = "PRISMA_POWER";
 
@@ -47,7 +48,7 @@ static void wait_for_power_on_over_usb(void)
         if (pressed && !down) {
             down = true;
             started = xTaskGetTickCount();
-        } else if (pressed && down && held_ms(started) >= POWER_OFF_HOLD_MS) {
+        } else if (pressed && down && held_ms(started) >= POWER_ON_HOLD_MS) {
             ESP_LOGI(TAG, "PWR 3 s -> POWER ON");
             gpio_set_level(BAT_EN_PIN, 1);
             vTaskDelay(pdMS_TO_TICKS(50));
@@ -61,7 +62,7 @@ static void wait_for_power_on_over_usb(void)
 
 static void enter_power_off_state(bool runtime)
 {
-    ESP_LOGI(TAG, "PWR 3 s -> POWER OFF");
+    ESP_LOGI(TAG, "PWR 5 s -> POWER OFF");
 
     if (runtime) {
         gpio_set_level(LCD_BL_PIN, 0);
@@ -90,7 +91,7 @@ static void require_long_hold_on_battery_start(void)
     ESP_LOGI(TAG, "PWR held at boot; validating 3 s power-on hold");
 
     while (power_key_pressed()) {
-        if (held_ms(started) >= POWER_OFF_HOLD_MS) {
+        if (held_ms(started) >= POWER_ON_HOLD_MS) {
             ESP_LOGI(TAG, "PWR 3 s -> startup accepted");
             return;
         }
@@ -124,8 +125,8 @@ static void power_button_task(void *arg)
             down = false;
 
             /*
-             * Restart is intentionally decided on release. This lets a
-             * continuous 3 s hold reach POWER OFF without restarting at 2 s.
+             * Restart is intentionally decided on release. A continuous 5 s
+             * hold therefore reaches POWER OFF without restarting at 2 s.
              */
             if (duration >= RESTART_HOLD_MS && duration < POWER_OFF_HOLD_MS) {
                 ESP_LOGI(TAG, "PWR %lu ms -> RESTART", (unsigned long)duration);
@@ -163,5 +164,5 @@ void prisma_power_init(void)
 
     BaseType_t ok = xTaskCreate(power_button_task, "prisma_power", 3072, NULL, 6, NULL);
     ESP_ERROR_CHECK(ok == pdPASS ? ESP_OK : ESP_ERR_NO_MEM);
-    ESP_LOGI(TAG, "Power control ready: 2 s + release = restart, 3 s hold = off/on");
+    ESP_LOGI(TAG, "Power control ready: 2 s + release = restart, 5 s hold = off, 3 s hold = on");
 }
