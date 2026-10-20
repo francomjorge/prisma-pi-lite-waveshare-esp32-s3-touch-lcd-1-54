@@ -13,6 +13,7 @@
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
+#include "midi_service.h"
 #include "prisma_metrics.h"
 #include "storage.h"
 
@@ -82,7 +83,7 @@ static esp_err_t overview_get(httpd_req_t *r)
     const esp_app_desc_t *app = esp_app_get_description();
     char b[768];
     snprintf(b, sizeof(b),
-        "{\"version\":\"PRISMA-PI LITE FACTORY V1\","
+        "{\"version\":\"PRISMA-PI LITE FACTORY V1.1 MIDI\","
         "\"idf\":\"%s\",\"build_date\":\"%s\",\"build_time\":\"%s\","
         "\"uptime_ms\":%llu,\"heap_free\":%u,\"heap_min\":%u,"
         "\"reset_reason\":\"%s\",\"flash_bytes\":%u,\"psram_bytes\":%u,"
@@ -271,6 +272,7 @@ static esp_err_t file_delete(httpd_req_t *r)
     snprintf(path, sizeof(path), "/storage/%s", name);
     if (remove(path) != 0)
         return httpd_resp_send_err(r, HTTPD_404_NOT_FOUND, "not found");
+    prisma_midi_on_file_deleted(name);
     return send_json(r, "{\"ok\":true}");
 }
 
@@ -310,6 +312,49 @@ static esp_err_t file_download_get(httpd_req_t *r)
     return httpd_resp_send_chunk(r, NULL, 0);
 }
 
+static esp_err_t midi_status_get(httpd_req_t *r)
+{
+    prisma_midi_status_t s;
+    prisma_midi_get_status(&s);
+    char b[512];
+    snprintf(b, sizeof(b),
+        "{\"host_ready\":%s,\"usb_present\":%s,\"midi_connected\":%s,"
+        "\"vid\":%u,\"pid\":%u,\"play_sound\":%s,"
+        "\"selected_file_present\":%s,\"sound_file\":\"%s\",\"revision\":%u}",
+        s.host_ready ? "true" : "false",
+        s.usb_present ? "true" : "false",
+        s.midi_connected ? "true" : "false",
+        (unsigned)s.vid, (unsigned)s.pid,
+        s.play_sound ? "true" : "false",
+        s.selected_file_present ? "true" : "false",
+        s.sound_file,
+        (unsigned)s.revision);
+    return send_json(r, b);
+}
+
+static esp_err_t midi_config_post(httpd_req_t *r)
+{
+    char query[256];
+    char play_raw[16] = {0};
+    char file_raw[96] = {0};
+    char file_name[FACTORY_MAX_FILENAME + 1] = {0};
+
+    if (httpd_req_get_url_query_str(r, query, sizeof(query)) != ESP_OK)
+        return httpd_resp_send_err(r, HTTPD_400_BAD_REQUEST, "missing config");
+    if (httpd_query_key_value(query, "play", play_raw, sizeof(play_raw)) != ESP_OK)
+        return httpd_resp_send_err(r, HTTPD_400_BAD_REQUEST, "missing play");
+    httpd_query_key_value(query, "file", file_raw, sizeof(file_raw));
+    url_decode(file_raw);
+
+    bool play = strcmp(play_raw, "1") == 0 || !strcasecmp(play_raw, "true");
+    if (file_raw[0] && !sanitize_name(file_name, sizeof(file_name), file_raw))
+        return httpd_resp_send_err(r, HTTPD_400_BAD_REQUEST, "invalid file");
+
+    if (!prisma_midi_set_config(play, file_name))
+        return httpd_resp_send_err(r, HTTPD_400_BAD_REQUEST, "file not found or config failed");
+    return send_json(r, "{\"ok\":true}");
+}
+
 void prisma_admin_register(httpd_handle_t server)
 {
     if (!server) return;
@@ -322,6 +367,8 @@ void prisma_admin_register(httpd_handle_t server)
     httpd_uri_t files_post = {.uri="/api/files",.method=HTTP_POST,.handler=file_upload_post};
     httpd_uri_t files_delete = {.uri="/api/files",.method=HTTP_DELETE,.handler=file_delete};
     httpd_uri_t files_download = {.uri="/files/*",.method=HTTP_GET,.handler=file_download_get};
+    httpd_uri_t midi_status = {.uri="/api/midi/status",.method=HTTP_GET,.handler=midi_status_get};
+    httpd_uri_t midi_config = {.uri="/api/midi/config",.method=HTTP_POST,.handler=midi_config_post};
 
     httpd_register_uri_handler(server, &admin);
     httpd_register_uri_handler(server, &css);
@@ -331,4 +378,6 @@ void prisma_admin_register(httpd_handle_t server)
     httpd_register_uri_handler(server, &files_post);
     httpd_register_uri_handler(server, &files_delete);
     httpd_register_uri_handler(server, &files_download);
+    httpd_register_uri_handler(server, &midi_status);
+    httpd_register_uri_handler(server, &midi_config);
 }
