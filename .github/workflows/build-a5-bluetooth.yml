@@ -1,0 +1,99 @@
+name: ESP-IDF A5 Bluetooth
+
+on:
+  push:
+    branches: [admin-v2-a5-bluetooth]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate A4.1 volume baseline
+        run: python3 tools/test_admin_v2_a4_1_volume.py
+
+      - name: Validate A4.1.3 playback baseline
+        run: python3 tools/test_admin_v2_a4_1_1_playback.py
+
+      - name: Validate Factory Audio microphone baseline
+        run: python3 tools/test_admin_v2_a4_2_mic.py
+
+      - name: Validate A5 Bluetooth
+        run: python3 tools/test_admin_v2_a5_bluetooth.py
+
+      - name: Install ESP-IDF v5.5.1
+        uses: espressif/install-esp-idf-action@v1
+        with:
+          version: "v5.5.1"
+
+      - name: Build ESP32-S3 firmware
+        shell: bash
+        run: |
+          set -o pipefail
+          idf.py build 2>&1 | tee build-a5.log
+        env:
+          IDF_TARGET: esp32s3
+
+      - name: Build A5 Bluetooth full merged BIN
+        shell: bash
+        run: |
+          set -euo pipefail
+          idf.py merge-bin -o prisma-pi-lite-admin-v2-a5-bluetooth.bin -f raw
+          test -f build/prisma-pi-lite-admin-v2-a5-bluetooth.bin
+
+      - name: Package A5 upgrade preserving files and NVS
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist/a5-upgrade
+          mkdir -p dist/a5-upgrade
+          cp build/bootloader/bootloader.bin dist/a5-upgrade/bootloader.bin
+          cp build/partition_table/partition-table.bin dist/a5-upgrade/partition-table.bin
+          app_bin="build/prisma_pi_lite_esp32s3.bin"
+          test -f "$app_bin"
+          cp "$app_bin" dist/a5-upgrade/prisma-pi-lite-admin-v2-a5-bluetooth-app.bin
+          cat > dist/a5-upgrade/FLASH.txt <<'EOF'
+          PRISMA-PI LITE - ADMIN V2 A5 BLUETOOTH
+
+          Base: FACTORY AUDIO V1.
+          Adds ESP32-S3 Bluetooth Low Energy using NimBLE: status, scan,
+          connect/disconnect, advertising and pairing/bonding in /admin -> BLUETOOTH.
+
+          ESP32-S3 is BLE-only. Bluetooth Classic / BR-EDR and A2DP headphone
+          audio are not supported by this hardware.
+
+          This upgrade preserves existing NVS, Wi-Fi/security settings and /storage data.
+          Do NOT run erase_flash.
+          Do NOT flash storage.bin.
+
+          From this directory, run:
+          python -m esptool --chip esp32s3 --baud 460800 write_flash 0x0 bootloader.bin 0x8000 partition-table.bin 0x10000 prisma-pi-lite-admin-v2-a5-bluetooth-app.bin
+          EOF
+          (cd dist/a5-upgrade && zip -q -j ../../prisma-pi-lite-admin-v2-a5-bluetooth-upgrade-preserve-files.zip bootloader.bin partition-table.bin prisma-pi-lite-admin-v2-a5-bluetooth-app.bin FLASH.txt)
+          sha256sum build/prisma-pi-lite-admin-v2-a5-bluetooth.bin prisma-pi-lite-admin-v2-a5-bluetooth-upgrade-preserve-files.zip > SHA256SUMS-A5.txt
+
+      - name: Upload firmware build
+        uses: actions/upload-artifact@v4
+        with:
+          name: prisma-pi-lite-a5-bluetooth
+          if-no-files-found: error
+          path: |
+            build/prisma_pi_lite_esp32s3.bin
+            build/prisma-pi-lite-admin-v2-a5-bluetooth.bin
+            build/bootloader/bootloader.bin
+            build/partition_table/partition-table.bin
+            build/flash_args
+            build/flasher_args.json
+            prisma-pi-lite-admin-v2-a5-bluetooth-upgrade-preserve-files.zip
+            SHA256SUMS-A5.txt
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prisma-pi-lite-a5-bluetooth-build-log
+          if-no-files-found: warn
+          path: build-a5.log
