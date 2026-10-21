@@ -57,5 +57,5 @@ void prisma_wifi_start(void)
 
     prisma_network_status_t status;
     prisma_network_get_status(&status);
-    ESP_LOGI(TAG, "%s ready at http://%s/admin (mic: /mic)", status.ap_ssid, status.ap_ip[0] ? status.ap_ip : "192.168.4.1");
+    ESP_LOGI(TAG, "%s ready at http://%s/admin", status.ap_ssid, status.ap_ip[0] ? status.ap_ip : "192.168.4.1");
 }
