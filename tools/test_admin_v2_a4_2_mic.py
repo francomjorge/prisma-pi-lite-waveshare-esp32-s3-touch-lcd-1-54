@@ -23,7 +23,8 @@ assert '#define MIC_BCLK GPIO_NUM_9' in mic
 assert '#define MIC_WS GPIO_NUM_10' in mic
 assert '#define MIC_DIN GPIO_NUM_11' in mic
 assert 'ES7210_CODEC_DEFAULT_ADDR' in mic
-assert 'ES7120_SEL_MIC1 | ES7120_SEL_MIC2 | ES7120_SEL_MIC3 | ES7120_SEL_MIC4' in mic
+assert 'ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3 | ES7210_SEL_MIC4' in mic
+assert 'ES7120_SEL_MIC' not in mic
 assert 'I2S_TDM_SLOT0 | I2S_TDM_SLOT1 | I2S_TDM_SLOT2 | I2S_TDM_SLOT3' in mic
 assert '.channel = 4' in mic
 assert 'ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0)' in mic
