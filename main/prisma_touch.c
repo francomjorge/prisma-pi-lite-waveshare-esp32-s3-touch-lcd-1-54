@@ -36,8 +36,10 @@ bool prisma_touch_init(void){
  ESP_LOGI(TAG,"CST816 READY chip=0x%02X",id);
  esp_err_t audio=prisma_audio_init(bus);
  ESP_LOGI(TAG,"AUDIO init: %s",esp_err_to_name(audio));
- esp_err_t mic=prisma_mic_init(bus);
- ESP_LOGI(TAG,"MIC init: %s",esp_err_to_name(mic));
+ /* Factory Audio V1.1 diagnostic: ES7210 RX normally starts after ES8311 TX
+  * on the same I2S0 clock pins. Keep RX disabled in this build so the
+  * physical ES8311 TEST TONE / WAV path can be isolated and validated. */
+ ESP_LOGW(TAG,"MIC init intentionally skipped in Factory Audio V1.1 diagnostic");
  return true;
 }
 
