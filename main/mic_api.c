@@ -9,11 +9,6 @@
 
 #define COOKIE_NAME "prisma_session"
 
-extern const uint8_t web_mic_html_start[] asm("_binary_mic_html_start");
-extern const uint8_t web_mic_html_end[] asm("_binary_mic_html_end");
-extern const uint8_t web_mic_css_start[] asm("_binary_mic_css_start");
-extern const uint8_t web_mic_css_end[] asm("_binary_mic_css_end");
-
 static void no_cache(httpd_req_t *r)
 {
     httpd_resp_set_hdr(r, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
@@ -65,20 +60,12 @@ static bool require_auth(httpd_req_t *r)
     return false;
 }
 
-static esp_err_t page_get(httpd_req_t *r)
+static esp_err_t legacy_page_get(httpd_req_t *r)
 {
-    httpd_resp_set_type(r, "text/html");
+    httpd_resp_set_status(r, "302 Found");
+    httpd_resp_set_hdr(r, "Location", "/admin#audio");
     no_cache(r);
-    return httpd_resp_send(r, (const char *)web_mic_html_start,
-                           (ssize_t)(web_mic_html_end - web_mic_html_start));
-}
-
-static esp_err_t css_get(httpd_req_t *r)
-{
-    httpd_resp_set_type(r, "text/css");
-    no_cache(r);
-    return httpd_resp_send(r, (const char *)web_mic_css_start,
-                           (ssize_t)(web_mic_css_end - web_mic_css_start));
+    return httpd_resp_send(r, NULL, 0);
 }
 
 static esp_err_t status_get(httpd_req_t *r)
@@ -156,13 +143,11 @@ static esp_err_t stop_post(httpd_req_t *r)
 void prisma_mic_api_register(httpd_handle_t server)
 {
     if (!server) return;
-    httpd_uri_t page = {.uri="/mic", .method=HTTP_GET, .handler=page_get};
-    httpd_uri_t css = {.uri="/mic.css", .method=HTTP_GET, .handler=css_get};
+    httpd_uri_t legacy = {.uri="/mic", .method=HTTP_GET, .handler=legacy_page_get};
     httpd_uri_t status = {.uri="/api/mic/status", .method=HTTP_GET, .handler=status_get};
     httpd_uri_t record = {.uri="/api/mic/record", .method=HTTP_POST, .handler=record_post};
     httpd_uri_t stop = {.uri="/api/mic/stop", .method=HTTP_POST, .handler=stop_post};
-    httpd_register_uri_handler(server, &page);
-    httpd_register_uri_handler(server, &css);
+    httpd_register_uri_handler(server, &legacy);
     httpd_register_uri_handler(server, &status);
     httpd_register_uri_handler(server, &record);
     httpd_register_uri_handler(server, &stop);
