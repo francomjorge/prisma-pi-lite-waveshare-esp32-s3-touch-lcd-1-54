@@ -7,6 +7,7 @@
 #include "audio_api.h"
 #include "files_plus_api.h"
 #include "network_service.h"
+#include "playback_http.h"
 #include "security_service.h"
 
 static const char *TAG = "ADMIN_WIFI";
@@ -35,13 +36,18 @@ void prisma_wifi_start(void)
     httpd_config_t hc = HTTPD_DEFAULT_CONFIG();
     hc.uri_match_fn = httpd_uri_match_wildcard;
     hc.lru_purge_enable = true;
-    hc.max_uri_handlers = 44;
+    hc.max_uri_handlers = 48;
     hc.stack_size = 12288;
 
     httpd_handle_t server = NULL;
     if (httpd_start(&server, &hc) == ESP_OK) {
         httpd_uri_t root = {.uri="/",.method=HTTP_GET,.handler=root_get};
         httpd_register_uri_handler(server, &root);
+
+        /* Register fixed-length media/download transport first. The legacy
+         * duplicate /files/* and /media/* registrations that follow are
+         * intentionally rejected, leaving these handlers authoritative. */
+        prisma_playback_http_register(server);
         prisma_admin_register(server);
         prisma_files_plus_register(server);
         prisma_audio_api_register(server);
