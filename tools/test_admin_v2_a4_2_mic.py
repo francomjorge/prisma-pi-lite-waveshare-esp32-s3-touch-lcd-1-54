@@ -15,12 +15,18 @@ workflow = (root / ".github/workflows/build.yml").read_text()
 assert '"mic_service.c"' in cmake and '"mic_api.c"' in cmake
 assert '"web/admin.html"' in cmake and '"web/admin.css"' in cmake
 assert '"web/mic.html"' not in cmake and '"web/mic.css"' not in cmake
-assert 'prisma_mic_init(bus)' in touch
-assert touch.index('prisma_audio_init(bus)') < touch.index('prisma_mic_init(bus)')
+# Factory Audio V1.1 diagnostic intentionally isolates ES8311 TX by not starting
+# ES7210 RX. Production Factory V1 still requires audio -> mic init order.
+diag_audio_only = 'MIC init intentionally skipped in Factory Audio V1.1 diagnostic' in touch
+if not diag_audio_only:
+    assert 'prisma_mic_init(bus)' in touch
+    assert touch.index('prisma_audio_init(bus)') < touch.index('prisma_mic_init(bus)')
+else:
+    assert 'prisma_audio_init(bus)' in touch
 assert 'prisma_mic_api_register(server);' in portal
 assert '(mic: /mic)' not in portal
 
-# Exact Waveshare capture hardware path.
+# Exact Waveshare capture hardware path remains compiled in the diagnostic.
 assert '#define MIC_MCLK GPIO_NUM_8' in mic
 assert '#define MIC_BCLK GPIO_NUM_9' in mic
 assert '#define MIC_WS GPIO_NUM_10' in mic
@@ -34,7 +40,6 @@ assert 'ESP_CODEC_DEV_MAKE_CHANNEL_MASK(0)' in mic
 assert 'MIC_GAIN_DB 30' in mic
 assert 'esp_codec_dev_read(s_input' in mic
 
-# Recording is bounded, stream-written and standard PCM WAV.
 assert '#define RECORD_NAME "mic_record.wav"' in mic
 assert '#define MAX_RECORD_SECONDS 10' in mic
 assert 'memcpy(h + 0, "RIFF", 4)' in mic
@@ -45,7 +50,6 @@ assert 'fwrite(samples, 1, chunk, record_file)' in mic
 assert 'save_selected(RECORD_NAME)' in mic
 assert 'prisma_storage_file_count() >= prisma_storage_max_files()' in mic
 
-# Single administration page: mic lives inside AUDIO; legacy /mic redirects.
 assert 'static bool require_auth' in api
 assert 'if (!require_auth(r)) return ESP_OK;' in api
 assert '"/api/mic/status"' in api
@@ -60,9 +64,8 @@ assert '/api/audio/play' in page
 assert 'dbFromPercent' in page and 'meterFromDb' in page
 assert 'micTrack' in css and 'speakerValue' in css and 'levelTrack' in css
 
-# Appliance UI remains frozen; this baseline is web-only.
 assert '#define PAGE_COUNT 1' in app
 assert 'factory-audio-v1' in workflow
 assert 'test_admin_v2_a4_2_mic.py' in workflow
 
-print('Factory Audio V1 OK: unified /admin audio UI, ES7210 capture, live log meter, bounded WAV recording and legacy /mic redirect')
+print('Factory Audio V1/V1.1 diagnostic OK: unified admin retained; ES8311 physical output isolation supported')
