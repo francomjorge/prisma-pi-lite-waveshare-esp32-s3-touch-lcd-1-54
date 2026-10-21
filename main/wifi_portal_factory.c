@@ -2,6 +2,8 @@
 
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include "admin_api.h"
 #include "admin_shell.h"
@@ -23,6 +25,21 @@ static esp_err_t root_get(httpd_req_t *r)
     return httpd_resp_send(r, NULL, 0);
 }
 
+static void ble_start_task(void *arg)
+{
+    (void)arg;
+
+    /* FACTORY AUDIO V1 proved the Wi-Fi/admin path first. Keep that contract:
+     * let HTTP settle before allocating the NimBLE host/controller resources. */
+    vTaskDelay(pdMS_TO_TICKS(1200));
+
+    esp_err_t ble = prisma_bluetooth_init();
+    if (ble != ESP_OK) ESP_LOGW(TAG, "BLE init failed after admin startup: %s", esp_err_to_name(ble));
+    else ESP_LOGI(TAG, "BLE init started after admin startup");
+
+    vTaskDelete(NULL);
+}
+
 void prisma_wifi_start(void)
 {
     esp_err_t net = prisma_network_init();
@@ -37,12 +54,6 @@ void prisma_wifi_start(void)
         return;
     }
 
-    /* A5 BLE is intentionally independent from Wi-Fi success after startup.
-     * ESP32-S3 provides BLE only (no BR/EDR / Classic Bluetooth). */
-    esp_err_t ble = prisma_bluetooth_init();
-    if (ble != ESP_OK) ESP_LOGW(TAG, "BLE init failed: %s", esp_err_to_name(ble));
-    else ESP_LOGI(TAG, "BLE init started");
-
     httpd_config_t hc = HTTPD_DEFAULT_CONFIG();
     hc.uri_match_fn = httpd_uri_match_wildcard;
     hc.lru_purge_enable = true;
@@ -50,22 +61,34 @@ void prisma_wifi_start(void)
     hc.stack_size = 12288;
 
     httpd_handle_t server = NULL;
-    if (httpd_start(&server, &hc) == ESP_OK) {
-        httpd_uri_t root = {.uri="/",.method=HTTP_GET,.handler=root_get};
-        httpd_register_uri_handler(server, &root);
-
-        /* Register authoritative transport and the extensible /admin shell
-         * before legacy handlers. Duplicate legacy registrations are rejected. */
-        prisma_playback_http_register(server);
-        prisma_admin_shell_register(server);
-        prisma_admin_register(server);
-        prisma_files_plus_register(server);
-        prisma_audio_api_register(server);
-        prisma_mic_api_register(server);
-        prisma_bluetooth_api_register(server);
+    esp_err_t http = httpd_start(&server, &hc);
+    if (http != ESP_OK) {
+        ESP_LOGE(TAG, "HTTP admin start failed: %s", esp_err_to_name(http));
+        return;
     }
+
+    httpd_uri_t root = {.uri="/",.method=HTTP_GET,.handler=root_get};
+    httpd_register_uri_handler(server, &root);
+
+    /* Preserve the already validated FACTORY AUDIO V1 admin/API surface.
+     * Bluetooth is additive: its API and shell extension are registered only
+     * after the same core routes are available. */
+    prisma_playback_http_register(server);
+    prisma_admin_shell_register(server);
+    prisma_admin_register(server);
+    prisma_files_plus_register(server);
+    prisma_audio_api_register(server);
+    prisma_mic_api_register(server);
+    prisma_bluetooth_api_register(server);
 
     prisma_network_status_t status;
     prisma_network_get_status(&status);
-    ESP_LOGI(TAG, "%s ready at http://%s/admin", status.ap_ssid, status.ap_ip[0] ? status.ap_ip : "192.168.4.1");
+    ESP_LOGI(TAG, "%s admin ready at http://%s/admin",
+             status.ap_ssid, status.ap_ip[0] ? status.ap_ip : "192.168.4.1");
+
+    /* BLE must never be able to prevent the rescue AP/admin page from coming
+     * up. Initialize it in a separate, delayed task after HTTP is live. */
+    if (xTaskCreate(ble_start_task, "ble_start", 4096, NULL, 3, NULL) != pdPASS) {
+        ESP_LOGW(TAG, "BLE deferred task allocation failed; admin remains available");
+    }
 }
