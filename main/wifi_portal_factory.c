@@ -45,7 +45,7 @@ void prisma_wifi_start(void)
         httpd_register_uri_handler(server, &root);
 
         /* Register fixed-length media/download transport first. The legacy
-         * duplicate /files/* and /media/* registrations that follow are
+         * duplicate file and media wildcard registrations that follow are
          * intentionally rejected, leaving these handlers authoritative. */
         prisma_playback_http_register(server);
         prisma_admin_register(server);
