@@ -33,7 +33,9 @@
 #define AUDIO_NS "audio_cfg"
 #define AUDIO_VOLUME "volume"
 #define DEFAULT_VOLUME 70
-#define PLAY_STACK 6144
+#define PLAY_STACK 8192
+#define WAV_RAW_BYTES 512
+#define WAV_OUT_SAMPLES 512
 
 static const char *TAG = "PRISMA_AUDIO";
 static SemaphoreHandle_t s_lock;
@@ -172,8 +174,11 @@ static bool play_wav_file(const char *name)
 {
     char path[128];
     snprintf(path, sizeof(path), "/storage/%s", name);
+    ESP_LOGI(TAG, "WAV open: %s", path);
+
     FILE *f = fopen(path, "rb");
     if (!f) {
+        ESP_LOGE(TAG, "WAV fopen failed: %s", path);
         set_error("Selected WAV not found");
         return false;
     }
@@ -181,6 +186,7 @@ static bool play_wav_file(const char *name)
     wav_info_t w;
     if (!parse_wav(f, &w)) {
         fclose(f);
+        ESP_LOGE(TAG, "WAV parse failed: %s", path);
         set_error("WAV must be PCM, 8/16-bit, mono/stereo, 8-48 kHz");
         return false;
     }
@@ -196,6 +202,10 @@ static bool play_wav_file(const char *name)
         ? (int)(((uint64_t)total_frames * 1000ULL) / w.rate)
         : 0;
 
+    ESP_LOGI(TAG, "WAV ready: %u Hz, %u-bit, %u ch, %u bytes, %d ms",
+             (unsigned)w.rate, (unsigned)w.bits, (unsigned)w.channels,
+             (unsigned)w.data_bytes, duration_ms);
+
     lock();
     s_status.source_rate = (int)w.rate;
     s_status.source_channels = w.channels;
@@ -204,8 +214,12 @@ static bool play_wav_file(const char *name)
     s_status.position_ms = 0;
     unlock();
 
-    uint8_t raw[1024];
-    int16_t out[2048];
+    /* Keep playback buffers deliberately small. A4.1.2 used about 5 KiB of
+     * local WAV buffers inside a 6 KiB FreeRTOS task, leaving too little room
+     * for stdio/decoder/codec call frames. That could make browser playback
+     * work while the on-device PLAY SELECTED WAV task failed. */
+    uint8_t raw[WAV_RAW_BYTES];
+    int16_t out[WAV_OUT_SAMPLES];
     size_t out_n = 0;
     uint32_t phase = 0;
     uint32_t frames_done = 0;
@@ -218,7 +232,15 @@ static bool play_wav_file(const char *name)
         if (!want) break;
 
         size_t got = fread(raw, 1, want, f);
-        if (!got) break;
+        if (!got) {
+            if (bytes_left) {
+                ESP_LOGE(TAG, "WAV read ended early with %u bytes remaining",
+                         (unsigned)bytes_left);
+                set_error("WAV read failed");
+                ok = false;
+            }
+            break;
+        }
         got -= got % frame_bytes;
         bytes_left -= (uint32_t)got;
         size_t frames = got / frame_bytes;
@@ -257,7 +279,7 @@ static bool play_wav_file(const char *name)
 
     if (ok && out_n && !s_stop) ok = write_pcm(out, out_n);
     fclose(f);
-    if (!ok) set_error("Audio codec write failed");
+    if (!ok && !s_status.last_error[0]) set_error("Audio codec write failed");
     return ok;
 }
 
