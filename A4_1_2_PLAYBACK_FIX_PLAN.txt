@@ -1,0 +1,7 @@
+PRISMA-PI LITE A4.1.2 playback stabilization
+
+- Remove automatic HTML5 audio preload from FILES+ to avoid blocking the ESP-IDF HTTP server on Safari/iOS.
+- Fix /files/* downloads to return a fixed Content-Length instead of chunked transfer.
+- Keep device-side WAV playback as the primary playback path.
+- Repair auth guards so unauthorized requests cannot continue after a 401.
+- Preserve A4.1 volume control, storage layout, physical UI and NVS/storage upgrade path.
