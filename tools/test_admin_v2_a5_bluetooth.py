@@ -66,9 +66,9 @@ for endpoint in [
     '/api/bluetooth/advertise'
 ]:
     assert endpoint in api
-assert '\"classic\":false' in api
-assert '\"a2dp\":false' in api
-assert '\"ble_midi_profile\":false' in api
+assert r'\"classic\":false' in api
+assert r'\"a2dp\":false' in api
+assert r'\"ble_midi_profile\":false' in api
 
 # The previously grey tab becomes a real admin tab with complete diagnostics.
 assert "textContent.trim() === 'BLUETOOTH'" in js
