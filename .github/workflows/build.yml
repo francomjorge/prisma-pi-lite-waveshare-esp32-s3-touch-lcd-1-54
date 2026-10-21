@@ -2,7 +2,7 @@ name: ESP-IDF build
 
 on:
   push:
-    branches: [main, m4.3-consolidated, m4.3-web4-readonly, m4.4-page2-bidirectional, m4.5-unified-build58-sync, m4.6-page2-build58-readonly, m4.7-page2-direct-readonly, m4.8-sync-lab, m4.9-global-web-sync, m4.10-clean-assets, m4.11-correct-assets-ci, m4.11-controller-stable, v5.0-no-effect-no-admin, v1.0-stable-power, v1.0-web-keyboard-nav, v1.0-liveview-rotate-key, v1.1-admin-readonly, v1.1-admin-official-telemetry, v0-fxlab-page5, v0-fxlab-rotate, v0-fxengine-infra, v0-fxengine-pixel-v1, v0-fxengine-glitch-v1-fullscreen, v0-fxengine-allfx-v1, v0-checkpoint-a-six-pages-motion, nanopad-v1-infra-home, admin-v2-a1-network, admin-v2-a2-security, admin-v2-a3-filesplus, admin-v2-a4-audio, admin-v2-a4-audio-hotfix, admin-v2-a4-1-volume, admin-v2-a4-1-1-playback, admin-v2-a4-2-mic]
+    branches: [main, m4.3-consolidated, m4.3-web4-readonly, m4.4-page2-bidirectional, m4.5-unified-build58-sync, m4.6-page2-build58-readonly, m4.7-page2-direct-readonly, m4.8-sync-lab, m4.9-global-web-sync, m4.10-clean-assets, m4.11-correct-assets-ci, m4.11-controller-stable, v5.0-no-effect-no-admin, v1.0-stable-power, v1.0-web-keyboard-nav, v1.0-liveview-rotate-key, v1.1-admin-readonly, v1.1-admin-official-telemetry, v0-fxlab-page5, v0-fxlab-rotate, v0-fxengine-infra, v0-fxengine-pixel-v1, v0-fxengine-glitch-v1-fullscreen, v0-fxengine-allfx-v1, v0-checkpoint-a-six-pages-motion, nanopad-v1-infra-home, admin-v2-a1-network, admin-v2-a2-security, admin-v2-a3-filesplus, admin-v2-a4-audio, admin-v2-a4-audio-hotfix, admin-v2-a4-1-volume, admin-v2-a4-1-1-playback, admin-v2-a4-2-mic, factory-audio-v1]
   workflow_dispatch:
 
 jobs:
@@ -33,23 +33,23 @@ jobs:
         run: python3 tools/test_admin_v2_a4_audio.py
 
       - name: Validate Admin V2 A4.1 Volume
-        if: github.ref_name == 'admin-v2-a4-1-volume' || github.ref_name == 'admin-v2-a4-1-1-playback' || github.ref_name == 'admin-v2-a4-2-mic'
+        if: github.ref_name == 'admin-v2-a4-1-volume' || github.ref_name == 'admin-v2-a4-1-1-playback' || github.ref_name == 'admin-v2-a4-2-mic' || github.ref_name == 'factory-audio-v1'
         run: python3 tools/test_admin_v2_a4_1_volume.py
 
       - name: Validate Admin V2 A4.1.1 Playback
-        if: github.ref_name == 'admin-v2-a4-1-1-playback' || github.ref_name == 'admin-v2-a4-2-mic'
+        if: github.ref_name == 'admin-v2-a4-1-1-playback' || github.ref_name == 'admin-v2-a4-2-mic' || github.ref_name == 'factory-audio-v1'
         run: python3 tools/test_admin_v2_a4_1_1_playback.py
 
-      - name: Validate Admin V2 A4.2 MIC
-        if: github.ref_name == 'admin-v2-a4-2-mic'
+      - name: Validate Admin V2 A4.2 MIC / Factory Audio
+        if: github.ref_name == 'admin-v2-a4-2-mic' || github.ref_name == 'factory-audio-v1'
         run: python3 tools/test_admin_v2_a4_2_mic.py
 
       - name: Validate checkpoint A
-        if: github.ref_name != 'nanopad-v1-infra-home' && github.ref_name != 'admin-v2-a1-network' && github.ref_name != 'admin-v2-a2-security' && github.ref_name != 'admin-v2-a3-filesplus' && github.ref_name != 'admin-v2-a4-audio' && github.ref_name != 'admin-v2-a4-audio-hotfix' && github.ref_name != 'admin-v2-a4-1-volume' && github.ref_name != 'admin-v2-a4-1-1-playback' && github.ref_name != 'admin-v2-a4-2-mic'
+        if: github.ref_name != 'nanopad-v1-infra-home' && github.ref_name != 'admin-v2-a1-network' && github.ref_name != 'admin-v2-a2-security' && github.ref_name != 'admin-v2-a3-filesplus' && github.ref_name != 'admin-v2-a4-audio' && github.ref_name != 'admin-v2-a4-audio-hotfix' && github.ref_name != 'admin-v2-a4-1-volume' && github.ref_name != 'admin-v2-a4-1-1-playback' && github.ref_name != 'admin-v2-a4-2-mic' && github.ref_name != 'factory-audio-v1'
         run: python3 tools/test_checkpoint_a.py
 
       - name: Validate legacy admin
-        if: github.ref_name != 'nanopad-v1-infra-home' && github.ref_name != 'admin-v2-a1-network' && github.ref_name != 'admin-v2-a2-security' && github.ref_name != 'admin-v2-a3-filesplus' && github.ref_name != 'admin-v2-a4-audio' && github.ref_name != 'admin-v2-a4-audio-hotfix' && github.ref_name != 'admin-v2-a4-1-volume' && github.ref_name != 'admin-v2-a4-1-1-playback' && github.ref_name != 'admin-v2-a4-2-mic'
+        if: github.ref_name != 'nanopad-v1-infra-home' && github.ref_name != 'admin-v2-a1-network' && github.ref_name != 'admin-v2-a2-security' && github.ref_name != 'admin-v2-a3-filesplus' && github.ref_name != 'admin-v2-a4-audio' && github.ref_name != 'admin-v2-a4-audio-hotfix' && github.ref_name != 'admin-v2-a4-1-volume' && github.ref_name != 'admin-v2-a4-1-1-playback' && github.ref_name != 'admin-v2-a4-2-mic' && github.ref_name != 'factory-audio-v1'
         run: python3 tools/test_admin_readonly.py
 
       - name: Install ESP-IDF v5.5.1
@@ -203,6 +203,42 @@ jobs:
           (cd dist/upgrade && zip -q -j ../../prisma-pi-lite-admin-v2-a4-2-mic-upgrade-preserve-files.zip bootloader.bin partition-table.bin prisma-pi-lite-admin-v2-a4-2-mic-app.bin FLASH.txt)
           sha256sum build/prisma-pi-lite-admin-v2-a4-2-mic.bin prisma-pi-lite-admin-v2-a4-2-mic-upgrade-preserve-files.zip > SHA256SUMS-A4.2.txt
 
+      - name: Build Factory Audio V1 single BIN
+        if: success() && github.ref_name == 'factory-audio-v1'
+        run: |
+          idf.py merge-bin -o prisma-pi-lite-factory-audio-v1.bin -f raw
+          test -f build/prisma-pi-lite-factory-audio-v1.bin
+
+      - name: Package Factory Audio V1 upgrade preserving files and NVS
+        if: success() && github.ref_name == 'factory-audio-v1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist/upgrade
+          mkdir -p dist/upgrade
+          cp build/bootloader/bootloader.bin dist/upgrade/bootloader.bin
+          cp build/partition_table/partition-table.bin dist/upgrade/partition-table.bin
+          app_bin="build/prisma_pi_lite_esp32s3.bin"
+          test -f "$app_bin"
+          cp "$app_bin" dist/upgrade/prisma-pi-lite-factory-audio-v1-app.bin
+          cat > dist/upgrade/FLASH.txt <<'EOF'
+          PRISMA-PI LITE - FACTORY AUDIO V1
+
+          Frozen working audio baseline: ES8311 speaker output, WAV playback,
+          ES7210 microphone capture, live meter and 1-10 second WAV recording.
+          All audio diagnostics and controls are unified under /admin -> AUDIO.
+          The legacy /mic route redirects to /admin#audio.
+
+          This upgrade preserves existing NVS, Wi-Fi/security settings and /storage data.
+          Do NOT run erase_flash.
+          Do NOT flash storage.bin.
+
+          From this directory, run:
+          python -m esptool --chip esp32s3 --baud 460800 write_flash 0x0 bootloader.bin 0x8000 partition-table.bin 0x10000 prisma-pi-lite-factory-audio-v1-app.bin
+          EOF
+          (cd dist/upgrade && zip -q -j ../../prisma-pi-lite-factory-audio-v1-upgrade-preserve-files.zip bootloader.bin partition-table.bin prisma-pi-lite-factory-audio-v1-app.bin FLASH.txt)
+          sha256sum build/prisma-pi-lite-factory-audio-v1.bin prisma-pi-lite-factory-audio-v1-upgrade-preserve-files.zip > SHA256SUMS-FACTORY-AUDIO-V1.txt
+
       - name: Upload firmware build
         if: success()
         uses: actions/upload-artifact@v4
@@ -221,6 +257,8 @@ jobs:
             SHA256SUMS-A4.1.1.txt
             prisma-pi-lite-admin-v2-a4-2-mic-upgrade-preserve-files.zip
             SHA256SUMS-A4.2.txt
+            prisma-pi-lite-factory-audio-v1-upgrade-preserve-files.zip
+            SHA256SUMS-FACTORY-AUDIO-V1.txt
 
       - name: Upload build log
         if: always()
