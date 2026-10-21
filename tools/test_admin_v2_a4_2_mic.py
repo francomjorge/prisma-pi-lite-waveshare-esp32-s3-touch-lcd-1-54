@@ -58,7 +58,7 @@ assert 'RECORD 5 SEC' in page and 'PLAY RECORDING' in page
 assert '/api/mic/status' in page and '/api/mic/record' in page
 assert '/api/audio/play' in page
 assert 'dbFromPercent' in page and 'meterFromDb' in page
-assert 'micLevelBar' in css and 'speakerValue' in css
+assert 'micTrack' in css and 'speakerValue' in css and 'levelTrack' in css
 
 # Appliance UI remains frozen; this baseline is web-only.
 assert '#define PAGE_COUNT 1' in app
