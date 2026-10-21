@@ -1,0 +1,15 @@
+PRISMA-PI LITE FACTORY AUDIO V1.1
+
+Base: factory-audio-v1 @ 299eebcce795dd682ae84b2f55918ba8f4ef6cb3
+Scope: restore physical ES8311 speaker playback while preserving unified /admin AUDIO and ES7210 microphone capture.
+
+Diagnosis:
+- ES8311 output uses I2S0 STD on GPIO8/9/10/12.
+- ES7210 microphone uses I2S0 TDM on the same clock GPIO8/9/10 and GPIO11 DIN.
+- Microphone is initialized after audio output.
+- Factory V1 web/mic works but physical TEST TONE / WAV output is silent.
+
+V1.1 strategy:
+- Explicitly pause/disable the ES7210 RX channel while ES8311 playback owns the shared I2S clock domain.
+- Resume ES7210 RX after tone/WAV playback completes.
+- Do not change web UI, FILES+, recording format, codec pins, or storage.
