@@ -8,6 +8,7 @@
 #include <strings.h>
 #include <sys/stat.h>
 
+#include "esp_heap_caps.h"
 #include "nvs.h"
 #include "security_service.h"
 #include "storage.h"
@@ -141,6 +142,57 @@ static const char *mime_for(const char *name)
     if (!strcasecmp(e,"json")) return "application/json";
     if (!strcasecmp(e,"txt")||!strcasecmp(e,"log")||!strcasecmp(e,"csv")) return "text/plain";
     return "application/octet-stream";
+}
+
+static bool parse_decimal(const char *s, uint64_t *value)
+{
+    if (!s || !*s || !value) return false;
+    uint64_t v = 0;
+    for (const char *p=s; *p; p++) {
+        if (*p < '0' || *p > '9') return false;
+        v = v * 10ULL + (uint64_t)(*p - '0');
+    }
+    *value = v;
+    return true;
+}
+
+/* Returns 0 for no Range header, 1 for a valid single range, -1 for invalid. */
+static int request_range(httpd_req_t *r, size_t total, size_t *start, size_t *end)
+{
+    if (!r || !start || !end) return -1;
+    *start = 0;
+    *end = total ? total - 1 : 0;
+
+    size_t n = httpd_req_get_hdr_value_len(r, "Range");
+    if (!n) return 0;
+    if (!total || n >= 96) return -1;
+
+    char hdr[96];
+    if (httpd_req_get_hdr_value_str(r, "Range", hdr, sizeof(hdr)) != ESP_OK) return -1;
+    if (strncmp(hdr, "bytes=", 6) || strchr(hdr + 6, ',')) return -1;
+
+    char *spec = hdr + 6;
+    char *dash = strchr(spec, '-');
+    if (!dash) return -1;
+    *dash = 0;
+
+    if (spec[0]) {
+        uint64_t a = 0, b = total - 1;
+        if (!parse_decimal(spec, &a)) return -1;
+        if (dash[1] && !parse_decimal(dash + 1, &b)) return -1;
+        if (a >= total || b < a) return -1;
+        if (b >= total) b = total - 1;
+        *start = (size_t)a;
+        *end = (size_t)b;
+        return 1;
+    }
+
+    uint64_t suffix = 0;
+    if (!parse_decimal(dash + 1, &suffix) || !suffix) return -1;
+    if (suffix >= total) *start = 0;
+    else *start = total - (size_t)suffix;
+    *end = total - 1;
+    return 1;
 }
 
 static uint16_t le16(const uint8_t *p) { return (uint16_t)p[0] | ((uint16_t)p[1]<<8); }
@@ -279,11 +331,44 @@ static esp_err_t media_get(httpd_req_t *r)
     char tmp[96]; strlcpy(tmp,raw,sizeof(tmp)); char *q=strchr(tmp,'?'); if(q)*q=0; url_decode(tmp);
     char name[MAX_NAME+1]; if(!safe_name(name,sizeof(name),tmp)) return httpd_resp_send_err(r,400,"invalid name");
     char path[128]; snprintf(path,sizeof(path),"/storage/%s",name);
+
+    struct stat st;
+    if (stat(path,&st)!=0 || !S_ISREG(st.st_mode)) return httpd_resp_send_err(r,404,"not found");
+    size_t total=(size_t)st.st_size, start=0, end=total?total-1:0;
+    int range=request_range(r,total,&start,&end);
+    if(range<0){
+        char cr[64]; snprintf(cr,sizeof(cr),"bytes */%u",(unsigned)total);
+        httpd_resp_set_hdr(r,"Content-Range",cr);
+        httpd_resp_set_status(r,"416 Range Not Satisfiable");
+        return httpd_resp_sendstr(r,"invalid range");
+    }
+
     FILE *f=fopen(path,"rb"); if(!f) return httpd_resp_send_err(r,404,"not found");
-    httpd_resp_set_type(r,mime_for(name)); no_cache(r); httpd_resp_set_hdr(r,"Content-Disposition","inline");
-    char buf[IO_CHUNK]; size_t n; esp_err_t err=ESP_OK;
-    while ((n=fread(buf,1,sizeof(buf),f))>0) if (httpd_resp_send_chunk(r,buf,n)!=ESP_OK) { err=ESP_FAIL; break; }
-    fclose(f); if(err!=ESP_OK)return err; return httpd_resp_send_chunk(r,NULL,0);
+    size_t send_len=total?end-start+1:0;
+    uint8_t *data=NULL;
+    if(send_len){
+        data=heap_caps_malloc(send_len,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
+        if(!data) data=heap_caps_malloc(send_len,MALLOC_CAP_8BIT);
+        if(!data){fclose(f);return httpd_resp_send_err(r,503,"not enough memory for media response");}
+        if(fseek(f,(long)start,SEEK_SET)!=0 || fread(data,1,send_len,f)!=send_len){
+            free(data);fclose(f);return httpd_resp_send_err(r,500,"media read failed");
+        }
+    }
+    fclose(f);
+
+    httpd_resp_set_type(r,mime_for(name));
+    no_cache(r);
+    httpd_resp_set_hdr(r,"Accept-Ranges","bytes");
+    httpd_resp_set_hdr(r,"Content-Disposition","inline");
+    char cr[96];
+    if(range==1){
+        httpd_resp_set_status(r,"206 Partial Content");
+        snprintf(cr,sizeof(cr),"bytes %u-%u/%u",(unsigned)start,(unsigned)end,(unsigned)total);
+        httpd_resp_set_hdr(r,"Content-Range",cr);
+    }
+    esp_err_t err=httpd_resp_send(r,(const char *)data,(ssize_t)send_len);
+    free(data);
+    return err;
 }
 
 static bool form_name(httpd_req_t *r, char out[MAX_NAME+1])
