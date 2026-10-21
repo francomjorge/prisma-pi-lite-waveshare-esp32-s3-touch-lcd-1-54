@@ -114,7 +114,6 @@ static int gap_event(struct ble_gap_event *event, void *arg);
 
 static esp_err_t start_advertising_internal(void)
 {
-    (void)arg;
     if (!should_advertise()) return ESP_OK;
     if (ble_gap_adv_active()) {
         lock_state();
