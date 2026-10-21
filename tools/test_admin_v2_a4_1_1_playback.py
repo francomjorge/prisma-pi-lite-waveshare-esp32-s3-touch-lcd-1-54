@@ -18,7 +18,7 @@ assert '"admin_api_factory.c"' not in cmake
 assert '"playback_http.c"' in cmake
 
 # Authoritative transport must be registered before legacy routes so the old
-# chunked /files/* and /media/* handlers cannot win registration.
+# chunked media/file handlers cannot win registration.
 assert 'prisma_playback_http_register(server);' in portal
 assert portal.index('prisma_playback_http_register(server);') < portal.index('prisma_admin_register(server);')
 assert portal.index('prisma_playback_http_register(server);') < portal.index('prisma_files_plus_register(server);')
@@ -37,4 +37,15 @@ assert '"/media/*"' in transport
 assert '"/files/*"' in transport
 assert 'attachment' in transport and 'inline' in transport
 
-print("Admin V2 A4.1.2 Playback OK: production routes fixed, HEAD/range/fixed-length media transport active, sample namespace aligned")
+# On-device WAV playback must keep enough FreeRTOS stack headroom. A4.1.2 had
+# 1024-byte input + 4096-byte PCM output arrays in a 6144-byte task stack.
+assert '#define PLAY_STACK 8192' in audio
+assert '#define WAV_RAW_BYTES 512' in audio
+assert '#define WAV_OUT_SAMPLES 512' in audio
+assert 'uint8_t raw[WAV_RAW_BYTES];' in audio
+assert 'int16_t out[WAV_OUT_SAMPLES];' in audio
+assert 'uint8_t raw[1024];' not in audio
+assert 'int16_t out[2048];' not in audio
+assert 'WAV read failed' in audio
+
+print("Admin V2 A4.1.3 Playback OK: browser transport preserved and on-device WAV task has safe stack headroom")
