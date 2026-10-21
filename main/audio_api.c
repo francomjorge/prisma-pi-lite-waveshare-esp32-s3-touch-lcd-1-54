@@ -130,6 +130,17 @@ static void le32(uint8_t *p,uint32_t v){p[0]=(uint8_t)v;p[1]=(uint8_t)(v>>8);p[2
 static esp_err_t web_tone_get(httpd_req_t *r)
 {
     if(require_auth(r)!=ESP_OK)return ESP_OK;
+    int midi=69;
+    size_t qlen=httpd_req_get_url_query_len(r);
+    if(qlen>0&&qlen<128){
+        char query[128],value[16];
+        if(httpd_req_get_url_query_str(r,query,sizeof(query))==ESP_OK&&httpd_query_key_value(query,"note",value,sizeof(value))==ESP_OK){
+            char *end=NULL;long parsed=strtol(value,&end,10);
+            if(end==value||*end||parsed<24||parsed>107)return httpd_resp_send_err(r,400,"note must be MIDI 24-107 (C1-B7)");
+            midi=(int)parsed;
+        }
+    }
+    const float freq=440.0f*powf(2.0f,((float)midi-69.0f)/12.0f);
     const size_t pcm_bytes=WEB_TONE_SAMPLES*2;
     const size_t total=44+pcm_bytes;
     uint8_t *wav=malloc(total);
@@ -138,10 +149,20 @@ static esp_err_t web_tone_get(httpd_req_t *r)
     le32(wav+16,16);le16(wav+20,1);le16(wav+22,1);le32(wav+24,WEB_TONE_RATE);
     le32(wav+28,WEB_TONE_RATE*2);le16(wav+32,2);le16(wav+34,16);memcpy(wav+36,"data",4);le32(wav+40,(uint32_t)pcm_bytes);
     int16_t *pcm=(int16_t *)(wav+44);
-    const float step=2.0f*3.14159265358979323846f*440.0f/(float)WEB_TONE_RATE;
-    for(int i=0;i<WEB_TONE_SAMPLES;i++)pcm[i]=(int16_t)(sinf(step*(float)i)*9000.0f);
+    const float step=2.0f*3.14159265358979323846f*freq/(float)WEB_TONE_RATE;
+    for(int i=0;i<WEB_TONE_SAMPLES;i++){
+        float env=1.0f;
+        if(i<160)env=(float)i/160.0f;
+        else if(i>WEB_TONE_SAMPLES-320)env=(float)(WEB_TONE_SAMPLES-i)/320.0f;
+        pcm[i]=(int16_t)(sinf(step*(float)i)*9000.0f*env);
+    }
+    char disposition[96];snprintf(disposition,sizeof(disposition),"inline; filename=prisma-note-%d.wav",midi);
+    char note_hdr[16];snprintf(note_hdr,sizeof(note_hdr),"%d",midi);
+    char freq_hdr[24];snprintf(freq_hdr,sizeof(freq_hdr),"%.3f",freq);
     httpd_resp_set_type(r,"audio/wav");
-    httpd_resp_set_hdr(r,"Content-Disposition","inline; filename=prisma-440hz.wav");
+    httpd_resp_set_hdr(r,"Content-Disposition",disposition);
+    httpd_resp_set_hdr(r,"X-Prisma-Midi-Note",note_hdr);
+    httpd_resp_set_hdr(r,"X-Prisma-Frequency-Hz",freq_hdr);
     no_cache(r);
     esp_err_t e=httpd_resp_send(r,(const char *)wav,total);
     free(wav);
