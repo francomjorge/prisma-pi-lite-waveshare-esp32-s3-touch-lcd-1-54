@@ -63,7 +63,8 @@ static void finish_recording(bool keep_file,const char *error){
  FILE *f=NULL; uint32_t bytes=0;
  lock(); f=s_record_file; bytes=s_record_bytes; s_record_file=NULL; s_status.recording=false;
  s_status.record_ms=(int)(((uint64_t)bytes*1000ULL)/(MIC_RATE*2ULL));
- if(error)strlcpy(s_status.last_error,error,sizeof(s_status.last_error)); unlock();
+ if(error){ strlcpy(s_status.last_error,error,sizeof(s_status.last_error)); }
+ unlock();
  if(!f)return;
  bool ok=keep_file&&bytes>0;
  if(ok){ uint8_t header[44]; make_wav_header(header,bytes); if(fflush(f)!=0||fseek(f,0,SEEK_SET)!=0||fwrite(header,1,sizeof(header),f)!=sizeof(header))ok=false; }
@@ -107,7 +108,8 @@ static void mic_task(void *arg){
   int rc=esp_codec_dev_read(s_input,samples,sizeof(samples));
   if(rc!=ESP_CODEC_DEV_OK){ if(!s_paused_for_playback)set_mic_error("Microphone read failed"); vTaskDelay(pdMS_TO_TICKS(40)); continue; }
   uint32_t peak=0; for(size_t i=0;i<MIC_CHUNK_SAMPLES;i++){ int32_t v=samples[i]; uint32_t a=(uint32_t)(v<0?-v:v); if(a>peak)peak=a; }
-  if(peak>32767U)peak=32767U; int raw=(int)((peak*100U)/32767U);
+  if(peak>32767U){ peak=32767U; }
+  int raw=(int)((peak*100U)/32767U);
   FILE *record_file=NULL; uint32_t record_bytes=0,target_bytes=0; bool recording=false,stop_now=false;
   lock(); int previous=s_status.level; s_status.peak=raw; s_status.level=raw>=previous?raw:((previous*3+raw)/4);
   recording=s_status.recording; record_file=s_record_file; record_bytes=s_record_bytes; target_bytes=s_record_target_bytes; stop_now=s_record_stop; unlock();
@@ -153,7 +155,8 @@ esp_err_t prisma_mic_init(i2c_master_bus_handle_t i2c_bus){
 void prisma_mic_get_status(prisma_mic_status_t *out){ if(!out)return; lock(); *out=s_status; unlock(); }
 
 esp_err_t prisma_mic_record_start(int seconds){
- if(!s_status.initialized||!s_input)return ESP_ERR_INVALID_STATE; if(seconds<1||seconds>MAX_RECORD_SECONDS)return ESP_ERR_INVALID_ARG;
+ if(!s_status.initialized||!s_input){ return ESP_ERR_INVALID_STATE; }
+ if(seconds<1||seconds>MAX_RECORD_SECONDS){ return ESP_ERR_INVALID_ARG; }
  prisma_audio_status_t audio; prisma_audio_get_status(&audio); if(audio.playing)return ESP_ERR_INVALID_STATE;
  lock(); bool busy=s_status.recording; unlock(); if(busy)return ESP_ERR_INVALID_STATE;
  if(s_paused_for_playback){esp_err_t r=prisma_mic_resume_after_playback();if(r!=ESP_OK)return r;}
