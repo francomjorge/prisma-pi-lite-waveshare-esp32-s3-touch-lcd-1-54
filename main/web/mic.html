@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PRISMA-PI LITE / MIC</title><link rel="stylesheet" href="/mic.css">
+</head>
+<body>
+<header><div><b>PRISMA<span>-PI</span></b><small>LITE / ADMIN V2 A4.2 MIC</small></div><a href="/admin">BACK TO ADMIN</a></header>
+<main>
+<section class="hero"><div class="eyebrow">MICROPHONE / ES7210</div><h1>LIVE CAPTURE</h1><p>Validación del camino MIC → ES7210 → ESP32-S3 → WAV → FILES+ → ES8311 → SPEAKER.</p></section>
+<div class="grid">
+<section class="card"><div class="eyebrow">HARDWARE</div><h2>Input path</h2><div id="state" class="big pending">CHECKING</div><div class="kv"><label>ADC</label><strong>ES7210</strong><label>DIN</label><strong>GPIO11</strong><label>Format</label><strong>16 kHz / 16-bit / mono</strong><label>Gain</label><strong id="gain">--</strong></div></section>
+<section class="card"><div class="eyebrow">LIVE LEVEL</div><h2>Microphone meter</h2><div class="meter"><div id="bar"></div></div><div class="ticks"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div><div class="kv"><label>Level</label><strong id="level">0%</strong><label>Instant peak</label><strong id="peak">0%</strong></div></section>
+<section class="card wide"><div class="eyebrow">RECORD</div><h2>Short WAV capture</h2><p>Graba directamente a SPIFFS como <code>mic_record.wav</code>. Al terminar queda seleccionado automáticamente como SAMPLE en FILES+.</p><div class="buttons"><button onclick="record(3)">RECORD 3 SEC</button><button onclick="record(5)">RECORD 5 SEC</button><button onclick="record(10)">RECORD 10 SEC</button><button class="danger" onclick="stopRecord()">STOP</button></div><div class="progress"><div id="recbar"></div></div><div class="kv"><label>Status</label><strong id="recordState">IDLE</strong><label>Position</label><strong id="recordPos">0 / 0 ms</strong><label>File</label><strong id="recordName">mic_record.wav</strong><label>Last error</label><strong id="error">NONE</strong></div><div class="buttons"><button onclick="playRecording()">PLAY RECORDING</button><button class="ghost" onclick="location.href='/admin'">OPEN FILES+ / AUDIO</button></div><div id="action" class="status"></div></section>
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+async function j(url,opt){const r=await fetch(url,opt);if(!r.ok)throw new Error((await r.text())||r.statusText);return r.json()}
+function form(o){return Object.entries(o).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&')}
+async function post(url,o={}){return j(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form(o)})}
+function paint(s){$('state').textContent=s.initialized?'READY':'NOT READY';$('state').className='big '+(s.initialized?'ready':'pending');$('gain').textContent=(s.gain_db??0)+' dB';$('level').textContent=(s.level??0)+'%';$('peak').textContent=(s.peak??0)+'%';$('bar').style.width=Math.max(0,Math.min(100,s.level||0))+'%';$('recordState').textContent=s.recording?'RECORDING':'IDLE';$('recordPos').textContent=(s.record_ms||0)+' / '+(s.record_target_ms||0)+' ms';$('recordName').textContent=s.record_name||'mic_record.wav';$('error').textContent=s.last_error||'NONE';let p=s.record_target_ms?Math.round((s.record_ms||0)*100/s.record_target_ms):0;$('recbar').style.width=Math.max(0,Math.min(100,p))+'%';if(!s.recording&&s.record_ms>0&&s.record_ms>=Math.min(250,s.record_target_ms||0))$('action').textContent='Recording saved and selected in FILES+.'}
+async function refresh(){try{paint(await j('/api/mic/status?x='+Date.now()))}catch(e){$('error').textContent=e.message}}
+async function record(seconds){try{await post('/api/mic/record',{seconds});$('action').textContent='Recording '+seconds+' seconds…';await refresh()}catch(e){$('action').textContent=e.message}}
+async function stopRecord(){try{await post('/api/mic/stop');$('action').textContent='Stopping…'}catch(e){$('action').textContent=e.message}}
+async function playRecording(){try{await post('/api/audio/play');$('action').textContent='Playback started through onboard speaker.'}catch(e){$('action').textContent=e.message}}
+setInterval(refresh,250);refresh();
+</script>
+</body></html>
