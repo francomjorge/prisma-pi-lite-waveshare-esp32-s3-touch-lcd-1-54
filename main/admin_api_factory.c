@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 
 #include "esp_app_desc.h"
+#include "esp_heap_caps.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "network_service.h"
@@ -416,24 +417,34 @@ static esp_err_t file_download_get(httpd_req_t *r)
 
     char path[128];
     snprintf(path, sizeof(path), "/storage/%s", name);
+    struct stat st;
+    if (stat(path, &st) != 0 || !S_ISREG(st.st_mode))
+        return httpd_resp_send_err(r, HTTPD_404_NOT_FOUND, "not found");
+
     FILE *f = fopen(path, "rb");
     if (!f) return httpd_resp_send_err(r, HTTPD_404_NOT_FOUND, "not found");
+    size_t size = (size_t)st.st_size;
+    uint8_t *data = NULL;
+    if (size) {
+        data = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!data) data = heap_caps_malloc(size, MALLOC_CAP_8BIT);
+        if (!data) { fclose(f); return httpd_resp_send_err(r, HTTPD_503_SERVICE_UNAVAILABLE, "not enough memory for download"); }
+        if (fread(data, 1, size, f) != size) {
+            free(data); fclose(f);
+            return httpd_resp_send_err(r, HTTPD_500_INTERNAL_SERVER_ERROR, "file read failed");
+        }
+    }
+    fclose(f);
 
     httpd_resp_set_type(r, mime_for(name));
     no_cache(r);
+    httpd_resp_set_hdr(r, "Accept-Ranges", "bytes");
     char disp[128];
     snprintf(disp, sizeof(disp), "attachment; filename=\"%s\"", name);
     httpd_resp_set_hdr(r, "Content-Disposition", disp);
-
-    char buf[IO_CHUNK];
-    size_t n;
-    esp_err_t err = ESP_OK;
-    while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
-        if (httpd_resp_send_chunk(r, buf, n) != ESP_OK) { err = ESP_FAIL; break; }
-    }
-    fclose(f);
-    if (err != ESP_OK) return err;
-    return httpd_resp_send_chunk(r, NULL, 0);
+    esp_err_t err = httpd_resp_send(r, (const char *)data, (ssize_t)size);
+    free(data);
+    return err;
 }
 
 void prisma_admin_register(httpd_handle_t server)
