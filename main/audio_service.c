@@ -28,7 +28,7 @@
 #define ES8311_PROBE_ADDR ((uint16_t)(ES8311_CODEC_DEFAULT_ADDR >> 1))
 #define ES7210_PROBE_ADDR ((uint16_t)(ES7210_CODEC_DEFAULT_ADDR >> 1))
 
-#define FILES_NS "files_cfg"
+#define FILES_NS "media_cfg"
 #define FILES_SAMPLE "sample"
 #define AUDIO_NS "audio_cfg"
 #define AUDIO_VOLUME "volume"
