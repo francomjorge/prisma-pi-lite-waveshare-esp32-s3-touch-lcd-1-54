@@ -6,6 +6,7 @@
 #include "admin_api.h"
 #include "audio_api.h"
 #include "files_plus_api.h"
+#include "mic_api.h"
 #include "network_service.h"
 #include "playback_http.h"
 #include "security_service.h"
@@ -51,9 +52,10 @@ void prisma_wifi_start(void)
         prisma_admin_register(server);
         prisma_files_plus_register(server);
         prisma_audio_api_register(server);
+        prisma_mic_api_register(server);
     }
 
     prisma_network_status_t status;
     prisma_network_get_status(&status);
-    ESP_LOGI(TAG, "%s ready at http://%s/admin", status.ap_ssid, status.ap_ip[0] ? status.ap_ip : "192.168.4.1");
+    ESP_LOGI(TAG, "%s ready at http://%s/admin (mic: /mic)", status.ap_ssid, status.ap_ip[0] ? status.ap_ip : "192.168.4.1");
 }
