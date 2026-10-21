@@ -36,10 +36,12 @@ bool prisma_touch_init(void){
  ESP_LOGI(TAG,"CST816 READY chip=0x%02X",id);
  esp_err_t audio=prisma_audio_init(bus);
  ESP_LOGI(TAG,"AUDIO init: %s",esp_err_to_name(audio));
- /* Factory Audio V1.1 diagnostic: ES7210 RX normally starts after ES8311 TX
-  * on the same I2S0 clock pins. Keep RX disabled in this build so the
-  * physical ES8311 TEST TONE / WAV path can be isolated and validated. */
- ESP_LOGW(TAG,"MIC init intentionally skipped in Factory Audio V1.1 diagnostic");
+ /* Factory Audio V1.2: restore ES7210 capture after the V1.1 hardware
+  * isolation proved the ES8311 output path. mic_service now owns the
+  * coexistence policy and must not leave the shared I2S0 clocks in a
+  * conflicting state while speaker playback is active. */
+ esp_err_t mic=prisma_mic_init(bus);
+ ESP_LOGI(TAG,"MIC init: %s",esp_err_to_name(mic));
  return true;
 }
 
