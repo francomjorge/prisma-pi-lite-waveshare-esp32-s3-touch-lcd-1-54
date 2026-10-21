@@ -3,11 +3,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "audio_service.h"
 #include "security_service.h"
 
 #define COOKIE_NAME "prisma_session"
+#define WEB_TONE_RATE 16000
+#define WEB_TONE_MS 500
+#define WEB_TONE_SAMPLES ((WEB_TONE_RATE * WEB_TONE_MS) / 1000)
 
 static void no_cache(httpd_req_t *r)
 {
@@ -120,6 +124,30 @@ static esp_err_t tone_post(httpd_req_t *r)
     httpd_resp_set_type(r,"application/json");no_cache(r);return httpd_resp_sendstr(r,"{\"ok\":true,\"mode\":\"tone\"}");
 }
 
+static void le16(uint8_t *p,uint16_t v){p[0]=(uint8_t)v;p[1]=(uint8_t)(v>>8);}
+static void le32(uint8_t *p,uint32_t v){p[0]=(uint8_t)v;p[1]=(uint8_t)(v>>8);p[2]=(uint8_t)(v>>16);p[3]=(uint8_t)(v>>24);}
+
+static esp_err_t web_tone_get(httpd_req_t *r)
+{
+    if(require_auth(r)!=ESP_OK)return ESP_OK;
+    const size_t pcm_bytes=WEB_TONE_SAMPLES*2;
+    const size_t total=44+pcm_bytes;
+    uint8_t *wav=malloc(total);
+    if(!wav)return httpd_resp_send_err(r,500,"not enough memory");
+    memcpy(wav,"RIFF",4);le32(wav+4,(uint32_t)(36+pcm_bytes));memcpy(wav+8,"WAVEfmt ",8);
+    le32(wav+16,16);le16(wav+20,1);le16(wav+22,1);le32(wav+24,WEB_TONE_RATE);
+    le32(wav+28,WEB_TONE_RATE*2);le16(wav+32,2);le16(wav+34,16);memcpy(wav+36,"data",4);le32(wav+40,(uint32_t)pcm_bytes);
+    int16_t *pcm=(int16_t *)(wav+44);
+    const float step=2.0f*3.14159265358979323846f*440.0f/(float)WEB_TONE_RATE;
+    for(int i=0;i<WEB_TONE_SAMPLES;i++)pcm[i]=(int16_t)(sinf(step*(float)i)*9000.0f);
+    httpd_resp_set_type(r,"audio/wav");
+    httpd_resp_set_hdr(r,"Content-Disposition","inline; filename=prisma-440hz.wav");
+    no_cache(r);
+    esp_err_t e=httpd_resp_send(r,(const char *)wav,total);
+    free(wav);
+    return e;
+}
+
 static esp_err_t play_post(httpd_req_t *r)
 {
     if(require_auth(r)!=ESP_OK)return ESP_OK;
@@ -142,11 +170,13 @@ void prisma_audio_api_register(httpd_handle_t server)
     httpd_uri_t s={.uri="/api/audio/status",.method=HTTP_GET,.handler=status_get};
     httpd_uri_t v={.uri="/api/audio/volume",.method=HTTP_POST,.handler=volume_post};
     httpd_uri_t t={.uri="/api/audio/tone",.method=HTTP_POST,.handler=tone_post};
+    httpd_uri_t w={.uri="/api/audio/tone.wav",.method=HTTP_GET,.handler=web_tone_get};
     httpd_uri_t p={.uri="/api/audio/play",.method=HTTP_POST,.handler=play_post};
     httpd_uri_t x={.uri="/api/audio/stop",.method=HTTP_POST,.handler=stop_post};
     httpd_register_uri_handler(server,&s);
     httpd_register_uri_handler(server,&v);
     httpd_register_uri_handler(server,&t);
+    httpd_register_uri_handler(server,&w);
     httpd_register_uri_handler(server,&p);
     httpd_register_uri_handler(server,&x);
 }
