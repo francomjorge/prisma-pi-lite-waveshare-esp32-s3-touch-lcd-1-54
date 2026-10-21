@@ -1,6 +1,7 @@
 #include "prisma_touch.h"
 #include "prisma_sensors.h"
 #include "audio_service.h"
+#include "mic_service.h"
 #include "driver/i2c_master.h"
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
@@ -35,6 +36,8 @@ bool prisma_touch_init(void){
  ESP_LOGI(TAG,"CST816 READY chip=0x%02X",id);
  esp_err_t audio=prisma_audio_init(bus);
  ESP_LOGI(TAG,"AUDIO init: %s",esp_err_to_name(audio));
+ esp_err_t mic=prisma_mic_init(bus);
+ ESP_LOGI(TAG,"MIC init: %s",esp_err_to_name(mic));
  return true;
 }
 
