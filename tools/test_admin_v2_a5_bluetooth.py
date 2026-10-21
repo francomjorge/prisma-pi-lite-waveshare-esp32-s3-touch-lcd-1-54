@@ -12,12 +12,15 @@ js = (root / "main/web/bluetooth.js").read_text()
 css = (root / "main/web/bluetooth.css").read_text()
 sdk = (root / "sdkconfig.defaults").read_text()
 app = (root / "main/app_factory_v1.c").read_text()
+admin_html = (root / "main/web/admin.html").read_text()
 
-# Factory Audio remains the base; physical appliance UI stays frozen.
+# FACTORY AUDIO V1 remains the product baseline; physical UI stays frozen.
 assert '#define PAGE_COUNT 1' in app
-assert 'FACTORY AUDIO V1' in (root / 'main/web/admin.html').read_text()
+assert 'FACTORY AUDIO V1' in admin_html
+# The base admin asset stays untouched; Bluetooth is an optional extension.
+assert '/bluetooth.js' not in admin_html
 
-# Build includes the BLE service/API and modular web extension.
+# Build includes BLE and the modular web extension.
 assert '"bluetooth_service.c"' in cmake
 assert '"bluetooth_api.c"' in cmake
 assert '"admin_shell.c"' in cmake
@@ -36,12 +39,28 @@ assert 'CONFIG_BT_NIMBLE_GATT_CLIENT=y' in sdk
 assert 'CONFIG_BT_NIMBLE_GATT_SERVER=y' in sdk
 assert 'CONFIG_BT_NIMBLE_NVS_PERSIST=y' in sdk
 
-# Runtime is initialized and exposed in the single /admin surface.
+# Regression guard: HTTP/admin must be alive BEFORE NimBLE is initialized.
+assert 'httpd_start(&server, &hc)' in portal
+assert 'xTaskCreate(ble_start_task' in portal
+assert portal.index('httpd_start(&server, &hc)') < portal.index('xTaskCreate(ble_start_task')
+assert 'vTaskDelay(pdMS_TO_TICKS(1200))' in portal
 assert 'prisma_bluetooth_init()' in portal
+assert 'admin remains available' in portal
+
+# /admin shell is fixed-length and fail-safe. Never make the working base page
+# depend on a large chunked response or successful extension allocation.
+assert 'src=\\"/bluetooth.js\\"' in shell
+assert 'heap_caps_malloc' in shell
+assert 'MALLOC_CAP_SPIRAM' in shell
+assert 'httpd_resp_send_chunk' not in shell
+assert 'httpd_resp_send(r, page' in shell
+assert 'serving base admin unchanged' in shell
+assert 'httpd_resp_send(r, start' in shell
+
+# Runtime is exposed in the single /admin surface.
 assert 'prisma_bluetooth_api_register(server);' in portal
 assert 'prisma_admin_shell_register(server);' in portal
 assert portal.index('prisma_admin_shell_register(server);') < portal.index('prisma_admin_register(server);')
-assert 'src=\\"/bluetooth.js\\"' in shell
 
 # BLE runtime capabilities: scan, advertise, connect, disconnect and bond.
 assert 'PRISMA_BT_MAX_DEVICES 20' in header
@@ -84,4 +103,4 @@ assert 'Classic Bluetooth' in js and 'NOT SUPPORTED' in js
 assert 'BLE MIDI profile' in js
 assert 'btDeviceList' in css and 'btCapabilities' in css
 
-print('Admin V2 A5 Bluetooth OK: unified BLE status, scan, connect, advertising, pairing/bonding and explicit no-Classic/A2DP capability reporting')
+print('Admin V2 A5 Bluetooth SAFE OK: Factory Audio admin first, fixed-length fail-safe shell, deferred NimBLE, BLE scan/connect/advertise/bonding preserved')
