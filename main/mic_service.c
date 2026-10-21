@@ -308,7 +308,7 @@ esp_err_t prisma_mic_init(i2c_master_bus_handle_t i2c_bus)
 
     es7210_codec_cfg_t codec_cfg = {0};
     codec_cfg.ctrl_if = ctrl_if;
-    codec_cfg.mic_selected = ES7120_SEL_MIC1 | ES7120_SEL_MIC2 | ES7120_SEL_MIC3 | ES7120_SEL_MIC4;
+    codec_cfg.mic_selected = ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3 | ES7210_SEL_MIC4;
     const audio_codec_if_t *codec_if = es7210_codec_new(&codec_cfg);
     if (!codec_if) {
         set_mic_error("ES7210 codec creation failed");
