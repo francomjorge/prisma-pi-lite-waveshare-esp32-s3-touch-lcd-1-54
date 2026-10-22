@@ -38,7 +38,10 @@ static esp_err_t imu_get(httpd_req_t *r)
     float amag=sqrtf((float)d.acc_x*d.acc_x+(float)d.acc_y*d.acc_y+(float)d.acc_z*d.acc_z);
     float gmag=sqrtf((float)d.gyr_x*d.gyr_x+(float)d.gyr_y*d.gyr_y+(float)d.gyr_z*d.gyr_z);
     static float gravity_ref=0.0f,prev_ax=0,prev_ay=0,prev_az=0;
-    if(gravity_ref<1.0f)gravity_ref=amag>1.0f?amag:1.0f;gravity_ref=gravity_ref*0.995f+amag*0.005f;
+    if(gravity_ref<1.0f){
+        gravity_ref=amag>1.0f?amag:1.0f;
+    }
+    gravity_ref=gravity_ref*0.995f+amag*0.005f;
     float da=sqrtf(((float)d.acc_x-prev_ax)*((float)d.acc_x-prev_ax)+((float)d.acc_y-prev_ay)*((float)d.acc_y-prev_ay)+((float)d.acc_z-prev_az)*((float)d.acc_z-prev_az));
     prev_ax=d.acc_x;prev_ay=d.acc_y;prev_az=d.acc_z;
     float linear=fabsf(amag-gravity_ref)/gravity_ref,delta=da/gravity_ref,motion=linear+delta*0.5f+gmag/32768.0f;if(motion>1.0f)motion=1.0f;
