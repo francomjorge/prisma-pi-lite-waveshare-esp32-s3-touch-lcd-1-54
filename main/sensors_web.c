@@ -9,7 +9,8 @@ extern const uint8_t web_sensors_html_start[] asm("_binary_sensors_html_start");
 extern const uint8_t web_sensors_html_end[] asm("_binary_sensors_html_end");
 
 static bool s_beep_enabled;
-static int s_orientation_volume = 0;
+static bool s_face_down;
+static float s_pitch_hz = 440.0f;
 
 static esp_err_t page_get(httpd_req_t *r)
 {
@@ -20,16 +21,12 @@ static esp_err_t page_get(httpd_req_t *r)
                            (ssize_t)(web_sensors_html_end - web_sensors_html_start));
 }
 
-static int volume_from_orientation_z(float z)
+static float pitch_from_orientation_x(float x)
 {
-    /* QMI orientation Z is 0..180 deg: tested upright ~=180, face-down ~=0. */
-    const float mute_deg = 15.0f;
-    const float full_deg = 165.0f;
-    if (z <= mute_deg) return 0;
-    if (z >= full_deg) return 100;
-    float n = (z - mute_deg) / (full_deg - mute_deg);
-    int v = (int)lroundf(n * 100.0f);
-    return v < 0 ? 0 : (v > 100 ? 100 : v);
+    /* X -90..0..+90 maps exponentially to 220..440..880 Hz. */
+    if (x < -90.0f) x = -90.0f;
+    if (x > 90.0f) x = 90.0f;
+    return 440.0f * powf(2.0f, x / 90.0f);
 }
 
 static esp_err_t imu_get(httpd_req_t *r)
@@ -61,27 +58,32 @@ static esp_err_t imu_get(httpd_req_t *r)
     float motion = linear + delta * 0.5f + gmag / 32768.0f;
     if (motion > 1.0f) motion = 1.0f;
 
-    s_orientation_volume = volume_from_orientation_z(d.angle_z);
+    /* Discrete Z gesture with hysteresis: never attenuate the normal volume. */
+    if (!s_face_down && d.angle_z < 20.0f) s_face_down = true;
+    else if (s_face_down && d.angle_z > 35.0f) s_face_down = false;
+
+    s_pitch_hz = pitch_from_orientation_x(d.angle_x);
     if (s_beep_enabled) {
-        if (s_orientation_volume == 0) {
+        if (s_face_down) {
             if (prisma_audio_sensor_tone_active()) prisma_audio_sensor_tone_stop();
         } else {
-            if (!prisma_audio_sensor_tone_active()) prisma_audio_sensor_tone_start(440.0f);
-            prisma_audio_preview_volume(s_orientation_volume);
+            if (!prisma_audio_sensor_tone_active()) prisma_audio_sensor_tone_start(s_pitch_hz);
+            else prisma_audio_sensor_tone_set_frequency(s_pitch_hz);
         }
     }
 
-    char b[720];
+    char b[760];
     snprintf(b, sizeof(b),
         "{\"ready\":true,\"sample\":true,"
         "\"acc\":{\"x\":%d,\"y\":%d,\"z\":%d,\"magnitude\":%.1f},"
         "\"gyro\":{\"x\":%d,\"y\":%d,\"z\":%d,\"magnitude\":%.1f},"
         "\"angle\":{\"x\":%.2f,\"y\":%.2f,\"z\":%.2f},"
         "\"movement\":{\"index\":%.4f,\"linear\":%.4f,\"delta\":%.4f,\"moving\":%s},"
-        "\"beep\":{\"master\":%s,\"active\":%s,\"volume\":%d}}",
+        "\"beep\":{\"master\":%s,\"active\":%s,\"face_down\":%s,\"hz\":%.1f}}",
         d.acc_x,d.acc_y,d.acc_z,amag,d.gyr_x,d.gyr_y,d.gyr_z,gmag,
         d.angle_x,d.angle_y,d.angle_z,motion,linear,delta,motion>0.035f?"true":"false",
-        s_beep_enabled?"true":"false",prisma_audio_sensor_tone_active()?"true":"false",s_orientation_volume);
+        s_beep_enabled?"true":"false",prisma_audio_sensor_tone_active()?"true":"false",
+        s_face_down?"true":"false",s_pitch_hz);
     return httpd_resp_sendstr(r,b);
 }
 
@@ -98,17 +100,16 @@ static esp_err_t beep_post(httpd_req_t *r)
     bool on = query_on(r);
     esp_err_t e = ESP_OK;
     s_beep_enabled = on;
-    if (on && s_orientation_volume > 0) {
-        prisma_audio_preview_volume(s_orientation_volume);
-        e = prisma_audio_sensor_tone_start(440.0f);
+    if (on && !s_face_down) {
+        e = prisma_audio_sensor_tone_start(s_pitch_hz);
         if (e != ESP_OK) s_beep_enabled = false;
     } else {
         prisma_audio_sensor_tone_stop();
     }
-    char b[128];
-    snprintf(b,sizeof(b),"{\"ok\":%s,\"enabled\":%s,\"active\":%s,\"volume\":%d}",
+    char b[144];
+    snprintf(b,sizeof(b),"{\"ok\":%s,\"enabled\":%s,\"active\":%s,\"face_down\":%s,\"hz\":%.1f}",
              e==ESP_OK?"true":"false",s_beep_enabled?"true":"false",
-             prisma_audio_sensor_tone_active()?"true":"false",s_orientation_volume);
+             prisma_audio_sensor_tone_active()?"true":"false",s_face_down?"true":"false",s_pitch_hz);
     httpd_resp_set_type(r,"application/json");
     return httpd_resp_sendstr(r,b);
 }
