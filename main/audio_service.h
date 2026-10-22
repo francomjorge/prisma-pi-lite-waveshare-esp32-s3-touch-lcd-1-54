@@ -30,3 +30,8 @@ esp_err_t prisma_audio_set_volume(int volume);
 esp_err_t prisma_audio_play_selected(void);
 esp_err_t prisma_audio_play_tone(void);
 void prisma_audio_stop(void);
+
+/* ES8311 and ES7210 share I2S0 clocks. Recording explicitly hands I2S0 to
+ * the microphone and restores the speaker STD configuration afterwards. */
+esp_err_t prisma_audio_suspend_for_mic(void);
+esp_err_t prisma_audio_resume_after_mic(void);
