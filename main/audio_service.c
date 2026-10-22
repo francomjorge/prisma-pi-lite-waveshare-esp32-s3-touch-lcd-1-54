@@ -29,6 +29,8 @@
 #define AUDIO_VOLUME "volume"
 #define DEFAULT_VOLUME 70
 #define PLAY_STACK 8192
+#define SENSOR_TONE_MIN_HZ 80.0f
+#define SENSOR_TONE_MAX_HZ 2000.0f
 
 static const char *TAG = "PRISMA_AUDIO";
 static SemaphoreHandle_t s_lock;
@@ -37,6 +39,10 @@ static esp_codec_dev_handle_t s_output;
 static prisma_audio_status_t s_status;
 static volatile bool s_stop;
 static TaskHandle_t s_play_task;
+static volatile bool s_sensor_tone_stop;
+static volatile bool s_sensor_tone_active;
+static volatile float s_sensor_tone_hz = 440.0f;
+static TaskHandle_t s_sensor_tone_task;
 
 typedef struct { uint16_t format,channels; uint32_t rate; uint16_t bits; uint32_t data_offset,data_bytes; } wav_info_t;
 static uint16_t le16(const uint8_t*p){return (uint16_t)p[0]|((uint16_t)p[1]<<8);}
@@ -60,11 +66,6 @@ static bool parse_wav(FILE*f,wav_info_t*w){
 static int16_t sample_at(const uint8_t*p,int bits){return bits==8?(int16_t)(((int)p[0]-128)<<8):(int16_t)le16(p);}
 static bool write_pcm(const int16_t*s,size_t n){return s_output&&n&&esp_codec_dev_write(s_output,(void*)s,(int)(n*sizeof(int16_t)))==ESP_CODEC_DEV_OK;}
 
-/* Deliberately simple nearest-neighbour resampler. The important property here is
- * that source consumption is monotonic: output_frames = src_frames*16000/src_rate.
- * The previous accumulator added 16000 and emitted while >= source_rate, which
- * produced zero output for 44.1/48 kHz blocks until enough frames accumulated and
- * made the web PLAY path fragile. */
 static bool play_wav_file(const char*name){
  char path[128];snprintf(path,sizeof(path),"/storage/%s",name);FILE*f=fopen(path,"rb");if(!f){set_error("Selected WAV not found");return false;}
  wav_info_t w;if(!parse_wav(f,&w)){fclose(f);set_error("WAV must be PCM 8/16-bit mono/stereo 8-48 kHz");return false;}
@@ -87,6 +88,31 @@ static bool play_wav_file(const char*name){
 static bool play_tone_internal(void){const int total=AUDIO_RATE/2;int16_t b[256];int done=0;while(done<total&&!s_stop){int n=total-done;if(n>256)n=256;for(int i=0;i<n;i++){float p=2.0f*3.14159265358979323846f*440.0f*(float)(done+i)/(float)AUDIO_RATE;b[i]=(int16_t)(sinf(p)*11000.0f);}if(!write_pcm(b,n)){set_error("Audio codec write failed");return false;}done+=n;lock();s_status.position_ms=done*1000/AUDIO_RATE;unlock();}return true;}
 static void playback_task(void*arg){bool tone=(bool)(uintptr_t)arg;char name[64];lock();strlcpy(name,s_status.playing_name,sizeof(name));unlock();bool ok=tone?play_tone_internal():play_wav_file(name);int16_t z[64]={0};if(s_output)write_pcm(z,64);lock();if(ok&&!s_stop)s_status.position_ms=s_status.duration_ms;s_status.playing=false;s_status.tone=false;s_play_task=NULL;unlock();vTaskDelete(NULL);}
 
+static void sensor_tone_task(void *arg)
+{
+    (void)arg;
+    int16_t b[128];
+    float phase = 0.0f;
+    const float two_pi = 6.28318530717958647692f;
+    while (!s_sensor_tone_stop) {
+        float hz = s_sensor_tone_hz;
+        if (hz < SENSOR_TONE_MIN_HZ) hz = SENSOR_TONE_MIN_HZ;
+        if (hz > SENSOR_TONE_MAX_HZ) hz = SENSOR_TONE_MAX_HZ;
+        float step = two_pi * hz / (float)AUDIO_RATE;
+        for (size_t i = 0; i < sizeof(b)/sizeof(b[0]); i++) {
+            b[i] = (int16_t)(sinf(phase) * 9000.0f);
+            phase += step;
+            if (phase >= two_pi) phase -= two_pi;
+        }
+        if (!write_pcm(b, sizeof(b)/sizeof(b[0]))) break;
+    }
+    int16_t z[64] = {0};
+    if (s_output) write_pcm(z, 64);
+    s_sensor_tone_active = false;
+    s_sensor_tone_task = NULL;
+    vTaskDelete(NULL);
+}
+
 esp_err_t prisma_audio_init(i2c_master_bus_handle_t bus){
  memset(&s_status,0,sizeof(s_status));s_lock=xSemaphoreCreateMutex();if(!s_lock)return ESP_ERR_NO_MEM;s_status.volume=load_volume();s_status.saved_volume=s_status.volume;load_selected(s_status.selected_sample);if(!bus){set_error("Shared I2C bus unavailable");return ESP_ERR_INVALID_STATE;}
  s_status.es8311_present=i2c_master_probe(bus,ES8311_PROBE_ADDR,100)==ESP_OK;s_status.es7210_present=i2c_master_probe(bus,ES7210_PROBE_ADDR,100)==ESP_OK;if(!s_status.es8311_present){set_error("ES8311 speaker codec not detected");return ESP_ERR_NOT_FOUND;}
@@ -99,5 +125,32 @@ esp_err_t prisma_audio_init(i2c_master_bus_handle_t bus){
 void prisma_audio_get_status(prisma_audio_status_t*out){if(!out)return;lock();load_selected(s_status.selected_sample);*out=s_status;unlock();}
 esp_err_t prisma_audio_preview_volume(int v){if(v<0||v>100)return ESP_ERR_INVALID_ARG;if(!s_output)return ESP_ERR_INVALID_STATE;if(esp_codec_dev_set_out_vol(s_output,v)!=ESP_CODEC_DEV_OK)return ESP_FAIL;lock();s_status.volume=v;unlock();return ESP_OK;}
 esp_err_t prisma_audio_set_volume(int v){esp_err_t e=prisma_audio_preview_volume(v);if(e!=ESP_OK)return e;if((e=save_volume(v))!=ESP_OK)return e;lock();s_status.saved_volume=v;unlock();return ESP_OK;}
-static esp_err_t start_play(bool tone){if(!s_status.initialized||!s_output)return ESP_ERR_INVALID_STATE;lock();if(s_status.playing){unlock();return ESP_ERR_INVALID_STATE;}if(!tone){load_selected(s_status.selected_sample);if(!s_status.selected_sample[0]){unlock();return ESP_ERR_NOT_FOUND;}strlcpy(s_status.playing_name,s_status.selected_sample,sizeof(s_status.playing_name));}else strlcpy(s_status.playing_name,"440 HZ TEST",sizeof(s_status.playing_name));s_status.playing=true;s_status.tone=tone;s_status.position_ms=0;s_status.duration_ms=tone?500:0;s_status.source_rate=tone?AUDIO_RATE:0;s_status.source_channels=tone?1:0;s_status.source_bits=tone?16:0;s_status.last_error[0]=0;s_stop=false;unlock();if(xTaskCreate(playback_task,"audio_play",PLAY_STACK,(void*)(uintptr_t)tone,5,&s_play_task)!=pdPASS){lock();s_status.playing=false;s_status.tone=false;s_play_task=NULL;unlock();return ESP_ERR_NO_MEM;}return ESP_OK;}
-esp_err_t prisma_audio_play_selected(void){return start_play(false);}esp_err_t prisma_audio_play_tone(void){return start_play(true);}void prisma_audio_stop(void){s_stop=true;}
+static esp_err_t start_play(bool tone){if(!s_status.initialized||!s_output||s_sensor_tone_active)return ESP_ERR_INVALID_STATE;lock();if(s_status.playing){unlock();return ESP_ERR_INVALID_STATE;}if(!tone){load_selected(s_status.selected_sample);if(!s_status.selected_sample[0]){unlock();return ESP_ERR_NOT_FOUND;}strlcpy(s_status.playing_name,s_status.selected_sample,sizeof(s_status.playing_name));}else strlcpy(s_status.playing_name,"440 HZ TEST",sizeof(s_status.playing_name));s_status.playing=true;s_status.tone=tone;s_status.position_ms=0;s_status.duration_ms=tone?500:0;s_status.source_rate=tone?AUDIO_RATE:0;s_status.source_channels=tone?1:0;s_status.source_bits=tone?16:0;s_status.last_error[0]=0;s_stop=false;unlock();if(xTaskCreate(playback_task,"audio_play",PLAY_STACK,(void*)(uintptr_t)tone,5,&s_play_task)!=pdPASS){lock();s_status.playing=false;s_status.tone=false;s_play_task=NULL;unlock();return ESP_ERR_NO_MEM;}return ESP_OK;}
+esp_err_t prisma_audio_play_selected(void){return start_play(false);}esp_err_t prisma_audio_play_tone(void){return start_play(true);}
+
+esp_err_t prisma_audio_sensor_tone_start(float hz)
+{
+    if (!s_status.initialized || !s_output || s_status.playing) return ESP_ERR_INVALID_STATE;
+    if (hz < SENSOR_TONE_MIN_HZ) hz = SENSOR_TONE_MIN_HZ;
+    if (hz > SENSOR_TONE_MAX_HZ) hz = SENSOR_TONE_MAX_HZ;
+    s_sensor_tone_hz = hz;
+    if (s_sensor_tone_active) return ESP_OK;
+    s_sensor_tone_stop = false;
+    s_sensor_tone_active = true;
+    if (xTaskCreate(sensor_tone_task, "sensor_tone", 4096, NULL, 5, &s_sensor_tone_task) != pdPASS) {
+        s_sensor_tone_active = false;
+        s_sensor_tone_task = NULL;
+        return ESP_ERR_NO_MEM;
+    }
+    return ESP_OK;
+}
+esp_err_t prisma_audio_sensor_tone_set_frequency(float hz)
+{
+    if (hz < SENSOR_TONE_MIN_HZ || hz > SENSOR_TONE_MAX_HZ) return ESP_ERR_INVALID_ARG;
+    s_sensor_tone_hz = hz;
+    return s_sensor_tone_active ? ESP_OK : ESP_ERR_INVALID_STATE;
+}
+void prisma_audio_sensor_tone_stop(void){s_sensor_tone_stop=true;}
+bool prisma_audio_sensor_tone_active(void){return s_sensor_tone_active;}
+float prisma_audio_sensor_tone_frequency(void){return s_sensor_tone_hz;}
+void prisma_audio_stop(void){s_stop=true;s_sensor_tone_stop=true;}
