@@ -8,6 +8,7 @@ typedef struct {
     bool active;
     bool face_down;
     int volume;
+    int voices;
     float pitch_hz;
     float angle_x;
     float angle_y;
