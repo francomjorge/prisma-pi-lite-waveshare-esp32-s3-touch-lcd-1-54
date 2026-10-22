@@ -29,10 +29,10 @@ esp_err_t prisma_audio_preview_volume(int volume);
 esp_err_t prisma_audio_set_volume(int volume);
 esp_err_t prisma_audio_play_selected(void);
 esp_err_t prisma_audio_play_tone(void);
-/* Continuous oscillator used by the sensor modulation test. Frequency can be
- * updated while it is running without restarting the codec/I2S path. */
 esp_err_t prisma_audio_sensor_tone_start(float hz);
 esp_err_t prisma_audio_sensor_tone_set_frequency(float hz);
+esp_err_t prisma_audio_sensor_tone_set_voices(int voices);
+int prisma_audio_sensor_tone_voices(void);
 void prisma_audio_sensor_tone_stop(void);
 bool prisma_audio_sensor_tone_active(void);
 float prisma_audio_sensor_tone_frequency(void);
