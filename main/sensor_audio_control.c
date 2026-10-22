@@ -9,7 +9,7 @@
 
 static SemaphoreHandle_t s_lock;
 static prisma_sensor_audio_state_t s = {
-    .enabled=false,.active=false,.face_down=false,.volume=100,.pitch_hz=440.0f
+    .enabled=false,.active=false,.face_down=false,.volume=100,.voices=1,.pitch_hz=440.0f
 };
 static TaskHandle_t s_task;
 
@@ -20,6 +20,17 @@ static float pitch_from_x(float x)
     return 440.0f * powf(2.0f, x / 90.0f);
 }
 
+static int voices_from_y(float y, int current)
+{
+    /* Five stable zones with ~6 degree hysteresis around each boundary. */
+    static const float up[4]   = {-61.5f,-16.5f, 28.5f, 67.5f};
+    static const float down[4] = {-67.5f,-22.5f, 22.5f, 61.5f};
+    if (current < 1 || current > 5) current = 1;
+    while (current < 5 && y > up[current-1]) current++;
+    while (current > 1 && y < down[current-2]) current--;
+    return current;
+}
+
 static void ctl_task(void *arg)
 {
     (void)arg;
@@ -27,14 +38,17 @@ static void ctl_task(void *arg)
         prisma_imu_data_t d;
         if (prisma_sensors_imu_ready() && prisma_sensors_read_imu(&d)) {
             bool enabled, face;
+            int voices;
             float hz = pitch_from_x(d.angle_x);
             xSemaphoreTake(s_lock, portMAX_DELAY);
             if (!s.face_down && d.angle_z < 20.0f) s.face_down=true;
             else if (s.face_down && d.angle_z > 35.0f) s.face_down=false;
+            s.voices=voices_from_y(d.angle_y,s.voices);
             s.angle_x=d.angle_x; s.angle_y=d.angle_y; s.angle_z=d.angle_z;
-            s.pitch_hz=hz; enabled=s.enabled; face=s.face_down;
+            s.pitch_hz=hz; enabled=s.enabled; face=s.face_down; voices=s.voices;
             xSemaphoreGive(s_lock);
 
+            prisma_audio_sensor_tone_set_voices(voices);
             if (enabled && !face) {
                 if (!prisma_audio_sensor_tone_active()) prisma_audio_sensor_tone_start(hz);
                 else prisma_audio_sensor_tone_set_frequency(hz);
@@ -54,9 +68,10 @@ esp_err_t prisma_sensor_audio_start(void)
     if (s_task) return ESP_OK;
     if (!s_lock) s_lock=xSemaphoreCreateMutex();
     if (!s_lock) return ESP_ERR_NO_MEM;
-    /* Sensor instrument starts at the only reliably audible level found so far. */
     prisma_audio_set_volume(100);
+    prisma_audio_sensor_tone_set_voices(1);
     s.volume=100;
+    s.voices=1;
     if (xTaskCreate(ctl_task,"sensor_audio",4096,NULL,5,&s_task)!=pdPASS) {
         s_task=NULL; return ESP_ERR_NO_MEM;
     }
