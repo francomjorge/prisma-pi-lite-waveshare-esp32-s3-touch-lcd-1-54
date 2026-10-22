@@ -27,21 +27,18 @@ bool prisma_touch_init(void){
  vTaskDelay(pdMS_TO_TICKS(80));
  i2c_master_bus_config_t bc={.i2c_port=I2C_NUM_0,.sda_io_num=TP_SDA,.scl_io_num=TP_SCL,.clk_source=I2C_CLK_SRC_DEFAULT,.glitch_ignore_cnt=7,.flags.enable_internal_pullup=true};
  if(i2c_new_master_bus(&bc,&bus)!=ESP_OK){ESP_LOGE(TAG,"I2C bus failed");return false;}
- /* Waveshare factory uses this same bus for QMI8658, CST816S and audio codecs. */
  prisma_sensors_init(bus);
  i2c_device_config_t dc={.dev_addr_length=I2C_ADDR_BIT_LEN_7,.device_address=TP_ADDR,.scl_speed_hz=400000};
  if(i2c_master_bus_add_device(bus,&dc,&dev)!=ESP_OK){ESP_LOGE(TAG,"CST816 add failed");return false;}
  uint8_t reg=0xA7,id=0;
  if(i2c_master_transmit_receive(dev,&reg,1,&id,1,100)!=ESP_OK){ESP_LOGE(TAG,"CST816 not found");return false;}
  ESP_LOGI(TAG,"CST816 READY chip=0x%02X",id);
- esp_err_t audio=prisma_audio_init(bus);
- ESP_LOGI(TAG,"AUDIO init: %s",esp_err_to_name(audio));
- /* Factory Audio V1.2: restore ES7210 capture after the V1.1 hardware
-  * isolation proved the ES8311 output path. mic_service now owns the
-  * coexistence policy and must not leave the shared I2S0 clocks in a
-  * conflicting state while speaker playback is active. */
+ /* Configure the microphone service first but leave RX disabled. Speaker is
+  * initialized last and therefore owns I2S0 STD clocks during normal use. */
  esp_err_t mic=prisma_mic_init(bus);
- ESP_LOGI(TAG,"MIC init: %s",esp_err_to_name(mic));
+ ESP_LOGI(TAG,"MIC init (idle OFF): %s",esp_err_to_name(mic));
+ esp_err_t audio=prisma_audio_init(bus);
+ ESP_LOGI(TAG,"AUDIO init (idle owner): %s",esp_err_to_name(audio));
  return true;
 }
 
