@@ -6,6 +6,7 @@
 #include "admin_api.h"
 #include "audio_api.h"
 #include "files_plus_api.h"
+#include "playback_http.h"
 #include "network_service.h"
 #include "security_service.h"
 
@@ -43,6 +44,8 @@ void prisma_wifi_start(void)
         httpd_uri_t root = {.uri="/",.method=HTTP_GET,.handler=root_get};
         httpd_register_uri_handler(server, &root);
         prisma_admin_register(server);
+        /* Register exact media/download transport before the legacy Files+ wildcard. */
+        prisma_playback_http_register(server);
         prisma_files_plus_register(server);
         prisma_audio_api_register(server);
     }
