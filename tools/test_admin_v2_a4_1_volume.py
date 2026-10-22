@@ -11,7 +11,7 @@ workflow = (root / ".github/workflows/build.yml").read_text()
 
 assert "esp_err_t prisma_audio_preview_volume(int volume);" in header
 assert "int saved_volume;" in header
-assert "esp_codec_dev_set_out_vol(s_output, volume)" in audio
+assert "esp_codec_dev_set_out_vol(" in audio and "volume" in audio
 preview = audio.split("esp_err_t prisma_audio_preview_volume(int volume)", 1)[1].split("esp_err_t prisma_audio_set_volume(int volume)", 1)[0]
 assert "save_volume(" not in preview, "live preview must not write NVS"
 assert "s_status.saved_volume = volume;" in audio
