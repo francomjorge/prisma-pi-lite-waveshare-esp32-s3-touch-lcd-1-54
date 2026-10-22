@@ -7,6 +7,7 @@
 #include "audio_api.h"
 #include "files_plus_api.h"
 #include "playback_http.h"
+#include "sensors_web.h"
 #include "network_service.h"
 #include "security_service.h"
 
@@ -36,7 +37,7 @@ void prisma_wifi_start(void)
     httpd_config_t hc = HTTPD_DEFAULT_CONFIG();
     hc.uri_match_fn = httpd_uri_match_wildcard;
     hc.lru_purge_enable = true;
-    hc.max_uri_handlers = 44;
+    hc.max_uri_handlers = 48;
     hc.stack_size = 12288;
 
     httpd_handle_t server = NULL;
@@ -44,6 +45,7 @@ void prisma_wifi_start(void)
         httpd_uri_t root = {.uri="/",.method=HTTP_GET,.handler=root_get};
         httpd_register_uri_handler(server, &root);
         prisma_admin_register(server);
+        prisma_sensors_web_register(server);
         /* Register exact media/download transport before the legacy Files+ wildcard. */
         prisma_playback_http_register(server);
         prisma_files_plus_register(server);
