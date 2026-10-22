@@ -26,10 +26,77 @@ static const char*mime_for(const char*n){const char*d=strrchr(n,'.');if(!d)retur
 static bool u64(const char*s,uint64_t*v){if(!s||!*s)return false;uint64_t x=0;for(;*s;s++){if(*s<'0'||*s>'9')return false;uint64_t y=x*10+(*s-'0');if(y<x)return false;x=y;}*v=x;return true;}
 static int get_range(httpd_req_t*r,size_t total,size_t*start,size_t*end){*start=0;*end=total?total-1:0;size_t n=httpd_req_get_hdr_value_len(r,"Range");if(!n)return 0;if(!total||n>=96)return-1;char h[96];if(httpd_req_get_hdr_value_str(r,"Range",h,sizeof(h))!=ESP_OK||strncmp(h,"bytes=",6)||strchr(h+6,','))return-1;char*s=h+6,*dash=strchr(s,'-');if(!dash)return-1;*dash=0;if(*s){uint64_t a=0,b=total-1;if(!u64(s,&a)||(dash[1]&&!u64(dash+1,&b))||a>=total||b<a)return-1;if(b>=total)b=total-1;*start=a;*end=b;return 1;}uint64_t suffix=0;if(!u64(dash+1,&suffix)||!suffix)return-1;*start=suffix>=total?0:total-suffix;*end=total-1;return 1;}
 static esp_err_t send_all(httpd_req_t*r,const char*b,size_t n){while(n){int s=httpd_send(r,b,n);if(s<=0)return ESP_FAIL;b+=s;n-=s;}return ESP_OK;}
-static esp_err_t serve(httpd_req_t*r,const char*prefix,bool attachment,bool head){
- if(!require_auth(r))return ESP_OK;char dec[96];strlcpy(dec,r->uri+strlen(prefix),sizeof(dec));char*q=strchr(dec,'?');if(q)*q=0;url_decode(dec);char name[MAX_NAME+1];if(!safe_name(name,sizeof(name),dec))return httpd_resp_send_err(r,400,"invalid name");char path[128];snprintf(path,sizeof(path),"/storage/%s",name);struct stat st;if(stat(path,&st)||!S_ISREG(st.st_mode))return httpd_resp_send_err(r,404,"not found");size_t total=st.st_size,start,end;int rg=get_range(r,total,&start,&end);if(rg<0){char h[256];int n=snprintf(h,sizeof(h),"HTTP/1.1 416 Range Not Satisfiable\r\nContent-Length: 0\r\nAccept-Ranges: bytes\r\nContent-Range: bytes */%u\r\n\r\n",(unsigned)total);return send_all(r,h,n);}
- size_t len=total?end-start+1:0;char rh[96]="";if(rg==1)snprintf(rh,sizeof(rh),"Content-Range: bytes %u-%u/%u\r\n",(unsigned)start,(unsigned)end,(unsigned)total);char h[768];int hn=snprintf(h,sizeof(h),"HTTP/1.1 %s\r\nContent-Type: %s\r\nContent-Length: %u\r\nAccept-Ranges: bytes\r\n%sContent-Disposition: %s; filename=\"%s\"\r\nContent-Transfer-Encoding: binary\r\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\r\nPragma: no-cache\r\n\r\n",rg==1?"206 Partial Content":"200 OK",mime_for(name),(unsigned)len,rh,attachment?"attachment":"inline",name);if(hn<=0||hn>=(int)sizeof(h)||send_all(r,h,hn)!=ESP_OK||head||!len)return ESP_OK;
- FILE*f=fopen(path,"rb");if(!f)return ESP_FAIL;if(start&&fseek(f,(long)start,SEEK_SET)){fclose(f);return ESP_FAIL;}char b[IO_CHUNK];size_t left=len;esp_err_t e=ESP_OK;while(left){size_t want=left<sizeof(b)?left:sizeof(b),got=fread(b,1,want,f);if(!got||send_all(r,b,got)!=ESP_OK){e=ESP_FAIL;break;}left-=got;}fclose(f);return e;
+
+static esp_err_t serve(httpd_req_t *r, const char *prefix, bool attachment, bool head)
+{
+    if (!require_auth(r)) {
+        return ESP_OK;
+    }
+
+    char dec[96];
+    strlcpy(dec, r->uri + strlen(prefix), sizeof(dec));
+    char *q = strchr(dec, '?');
+    if (q) *q = 0;
+    url_decode(dec);
+
+    char name[MAX_NAME + 1];
+    if (!safe_name(name, sizeof(name), dec)) {
+        return httpd_resp_send_err(r, 400, "invalid name");
+    }
+
+    char path[128];
+    snprintf(path, sizeof(path), "/storage/%s", name);
+    struct stat st;
+    if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) {
+        return httpd_resp_send_err(r, 404, "not found");
+    }
+
+    size_t total = (size_t)st.st_size;
+    size_t start = 0, end = 0;
+    int rg = get_range(r, total, &start, &end);
+    if (rg < 0) {
+        char h[256];
+        int n = snprintf(h, sizeof(h), "HTTP/1.1 416 Range Not Satisfiable\r\nContent-Length: 0\r\nAccept-Ranges: bytes\r\nContent-Range: bytes */%u\r\n\r\n", (unsigned)total);
+        return send_all(r, h, (size_t)n);
+    }
+
+    size_t len = total ? end - start + 1 : 0;
+    char rh[96] = "";
+    if (rg == 1) {
+        snprintf(rh, sizeof(rh), "Content-Range: bytes %u-%u/%u\r\n", (unsigned)start, (unsigned)end, (unsigned)total);
+    }
+
+    char h[768];
+    int hn = snprintf(h, sizeof(h),
+        "HTTP/1.1 %s\r\nContent-Type: %s\r\nContent-Length: %u\r\nAccept-Ranges: bytes\r\n%sContent-Disposition: %s; filename=\"%s\"\r\nContent-Transfer-Encoding: binary\r\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\r\nPragma: no-cache\r\n\r\n",
+        rg == 1 ? "206 Partial Content" : "200 OK", mime_for(name), (unsigned)len, rh,
+        attachment ? "attachment" : "inline", name);
+    if (hn <= 0 || hn >= (int)sizeof(h)) return ESP_FAIL;
+    if (send_all(r, h, (size_t)hn) != ESP_OK) return ESP_FAIL;
+    if (head || !len) return ESP_OK;
+
+    FILE *f = fopen(path, "rb");
+    if (!f) return ESP_FAIL;
+    if (start && fseek(f, (long)start, SEEK_SET) != 0) {
+        fclose(f);
+        return ESP_FAIL;
+    }
+
+    char b[IO_CHUNK];
+    size_t left = len;
+    esp_err_t e = ESP_OK;
+    while (left) {
+        size_t want = left < sizeof(b) ? left : sizeof(b);
+        size_t got = fread(b, 1, want, f);
+        if (!got || send_all(r, b, got) != ESP_OK) {
+            e = ESP_FAIL;
+            break;
+        }
+        left -= got;
+    }
+    fclose(f);
+    return e;
 }
+
 static esp_err_t media_get(httpd_req_t*r){return serve(r,"/media/",false,false);} static esp_err_t media_head(httpd_req_t*r){return serve(r,"/media/",false,true);} static esp_err_t files_get(httpd_req_t*r){return serve(r,"/files/",true,false);} static esp_err_t files_head(httpd_req_t*r){return serve(r,"/files/",true,true);}
 void prisma_playback_http_register(httpd_handle_t s){if(!s)return;httpd_uri_t a={.uri="/media/*",.method=HTTP_GET,.handler=media_get},b={.uri="/media/*",.method=HTTP_HEAD,.handler=media_head},c={.uri="/files/*",.method=HTTP_GET,.handler=files_get},d={.uri="/files/*",.method=HTTP_HEAD,.handler=files_head};httpd_register_uri_handler(s,&a);httpd_register_uri_handler(s,&b);httpd_register_uri_handler(s,&c);httpd_register_uri_handler(s,&d);}
