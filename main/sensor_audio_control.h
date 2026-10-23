@@ -19,7 +19,6 @@ typedef enum {
     PRISMA_WAVE_TRIANGLE,
     PRISMA_WAVE_SAW,
     PRISMA_WAVE_PULSE,
-    PRISMA_WAVE_NOISE,
     PRISMA_WAVE_COUNT
 } prisma_waveform_t;
 
