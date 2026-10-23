@@ -14,7 +14,7 @@ static prisma_sensor_audio_state_t s={.enabled=false,.active=false,.face_down=fa
 static TaskHandle_t s_task;
 static const char *NOTE[12]={"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 static const char *SCALE_NAMES[PRISMA_SCALE_COUNT]={"CHROMATIC","MAJOR","MINOR","DIMINISHED","DORIAN","WHOLE TONE"};
-static const char *WAVE_NAMES[PRISMA_WAVE_COUNT]={"SINE","SQUARE","TRIANGLE","SAW","PULSE","NOISE"};
+static const char *WAVE_NAMES[PRISMA_WAVE_COUNT]={"SINE","SQUARE","TRIANGLE","SAW","PULSE"};
 static const int MAJOR[]={0,2,4,5,7,9,11};
 static const int MINOR[]={0,2,3,5,7,8,10};
 static const int DIMINISHED[]={0,2,3,5,6,8,9,11};
