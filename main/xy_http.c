@@ -1,4 +1,5 @@
 #include "xy_http.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "xy_control.h"
