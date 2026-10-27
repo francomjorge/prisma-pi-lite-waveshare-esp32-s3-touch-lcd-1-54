@@ -17,14 +17,37 @@ static float clamp01(float v) {
     return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v);
 }
 
+static float absf_local(float v) {
+    return v < 0.0f ? -v : v;
+}
+
+static float filter_axis(float prev, float input) {
+    float d = input - prev;
+    float ad = absf_local(d);
+
+    /* About 0.7 px on a 240 px touch surface: reject idle jitter. */
+    if (ad <= 0.0030f) return prev;
+
+    /* Large gestures stay immediate; small quantized steps are softened. */
+    float alpha;
+    if (ad >= 0.0800f) alpha = 1.00f;
+    else if (ad >= 0.0300f) alpha = 0.84f;
+    else if (ad >= 0.0120f) alpha = 0.68f;
+    else alpha = 0.48f;
+
+    float out = prev + d * alpha;
+    if (absf_local(input - out) <= 0.0015f) out = input;
+    return clamp01(out);
+}
+
 static bool set_channel_locked(prisma_xy_channel_t channel, float x, float y) {
-    float dx = s_xy[channel].x - x;
-    float dy = s_xy[channel].y - y;
-    if (dx < 0.0f) dx = -dx;
-    if (dy < 0.0f) dy = -dy;
+    float nx = filter_axis(s_xy[channel].x, x);
+    float ny = filter_axis(s_xy[channel].y, y);
+    float dx = absf_local(s_xy[channel].x - nx);
+    float dy = absf_local(s_xy[channel].y - ny);
     if (dx <= 0.0005f && dy <= 0.0005f) return false;
-    s_xy[channel].x = x;
-    s_xy[channel].y = y;
+    s_xy[channel].x = nx;
+    s_xy[channel].y = ny;
     s_xy[channel].rev++;
     return true;
 }
