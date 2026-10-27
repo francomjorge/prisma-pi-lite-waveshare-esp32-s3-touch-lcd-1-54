@@ -1,7 +1,7 @@
 from pathlib import Path
 p=Path(__file__).resolve().parents[1]/"main"/"web"/"sensors.html"
 s=p.read_text(encoding="utf-8")
-if "function arpXYConfig()" in s and "function arpGateSet(" in s and "arpPadX=px;arpPadY=py" in s:
+if "function arpXYConfig()" in s and "function arpGateSet(" in s and "async function arpAudioPoll()" in s:
     print("audio XY ARP already applied")
     raise SystemExit(0)
 # The Stage1 panel exists by now; append the GATE control next to ARP.
@@ -10,7 +10,7 @@ new_row='<div class="arp-row"><button id="arp" onclick="toggleArp()">ARP</button
 assert old_row in s,"ARP panel signature missing"
 s=s.replace(old_row,new_row,1)
 old="let arpTimer=0,arpStep=0;function arpMidi()"
-new="let arpTimer=0,arpStep=0,arpNext=0,arpGatePct=100,arpGateOff=0;function arpGateSet(v){arpGatePct=Math.max(0,Math.min(100,Number(v)||0));arpGateValue.textContent=arpGatePct+'%';if(arpGatePct===0&&gain&&ac)gain.gain.setTargetAtTime(0,ac.currentTime,.005)}function arpXYConfig(){let x=Math.max(-1,Math.min(1,arpPadX)),y=Math.max(-1,Math.min(1,arpPadY));let bpm=Math.round(60+(x+1)*90);let sc=last&&Number.isFinite(+last.scale)?+last.scale:+scale.value;let iv=ARP_INTERVALS[sc]||ARP_INTERVALS[0];let count=Math.max(1,Math.min(iv.length,Math.round(1+(y+1)*.5*(iv.length-1))));return {bpm,count}}function arpMidi()"
+new="let arpTimer=0,arpStep=0,arpNext=0,arpGatePct=100,arpGateOff=0;function arpGateSet(v){arpGatePct=Math.max(0,Math.min(100,Number(v)||0));arpGateValue.textContent=arpGatePct+'%';if(arpGatePct===0&&gain&&ac)gain.gain.setTargetAtTime(0,ac.currentTime,.005)}function arpXYConfig(){let x=Math.max(0,Math.min(1,arpAudioX));let bpm=Math.round(60+x*180);let sc=last&&Number.isFinite(+last.scale)?+last.scale:+scale.value;let iv=ARP_INTERVALS[sc]||ARP_INTERVALS[0];let count=iv.length;return {bpm,count}}function arpMidi()"
 assert old in s,"ARP variable signature missing"
 s=s.replace(old,new,1)
 old="iv[arpStep++%iv.length]"
@@ -34,18 +34,20 @@ new="if(arpOn&&!arpTimer&&playing)startArpClock();if(!playing&&arpTimer)stopArpC
 assert old in s,"ARP sync signature missing"
 s=s.replace(old,new,1)
 old="arpState.textContent=arpOn?'ON · 120 BPM':'OFF';"
-new="arpState.textContent=arpOn?'ON · X TEMPO / Y NOTES · SOLO WEB':'OFF · SOLO WEB';"
+new="arpState.textContent=arpOn?'ON · X RATE · SOLO WEB':'OFF · SOLO WEB';"
 assert s.count(old)>=2,"ARP status signatures missing"
 s=s.replace(old,new)
 
 # Read the exact final XY values sent to the WebGL visual pad, after its existing smoothing.
 old="let tx=0,ty=0,tz=0,gx=0"
-new="let arpPadX=0,arpPadY=0;let tx=0,ty=0,tz=0,gx=0"
+new="let arpAudioX=.5;let tx=0,ty=0,tz=0,gx=0"
 assert old in s,"pad state signature missing"
 s=s.replace(old,new,1)
-old="if(keyHold){px=holdPx;py=holdPy}gl.uniform2f(U.R,w,h);"
-new="if(keyHold){px=holdPx;py=holdPy}arpPadX=px;arpPadY=py;gl.uniform2f(U.R,w,h);"
-assert old in s,"rendered XY pad signature missing"
+# Poll the real AUDIO X/Y pad endpoint (filtered server-side in xy_control.c).
+# Never use the unrelated fractal visual coordinates.
+old="function arpXYConfig()"
+assert old in s,"ARP XY function missing"
+new="let arpAudioRev=-1;async function arpAudioPoll(){try{let r=await fetch('/api/xy/audio',{cache:'no-store'});if(!r.ok)return;let d=await r.json();if(Number.isFinite(+d.x)){arpAudioX=Math.max(0,Math.min(1,+d.x));arpAudioRev=+d.rev||0;let a=document.getElementById('arpState');if(a&&arpOn)a.textContent='ON · '+arpXYConfig().bpm+' BPM · X RATE';}}catch(e){}}setInterval(arpAudioPoll,50);arpAudioPoll();function arpXYConfig()"
 s=s.replace(old,new,1)
 # Do not let the 250ms status poll defeat the GATE note-off envelope.
 old="gain.gain.setTargetAtTime(last.master&&!last.face_down?.09:0,ac.currentTime,.025);"
