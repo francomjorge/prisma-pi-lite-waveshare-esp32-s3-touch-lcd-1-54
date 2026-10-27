@@ -10,7 +10,7 @@ new_row='<div class="arp-row"><button id="arp" onclick="toggleArp()">ARP</button
 assert old_row in s,"ARP panel signature missing"
 s=s.replace(old_row,new_row,1)
 old="let arpTimer=0,arpStep=0;function arpMidi()"
-new="let arpTimer=0,arpStep=0,arpNext=0,arpGatePct=100,arpGateOff=0;function arpGateSet(v){arpGatePct=Math.max(0,Math.min(100,Number(v)||0));arpGateValue.textContent=arpGatePct+'%';if(arpGatePct===0&&gain&&ac)gain.gain.setTargetAtTime(0,ac.currentTime,.005)}function arpXYConfig(){let x=Math.max(-1,Math.min(1,tx)),y=Math.max(-1,Math.min(1,ty));let bpm=Math.round(60+(x+1)*90);let sc=last&&Number.isFinite(+last.scale)?+last.scale:+scale.value;let iv=ARP_INTERVALS[sc]||ARP_INTERVALS[0];let count=Math.max(1,Math.min(iv.length,Math.round(1+(y+1)*.5*(iv.length-1))));return {bpm,count}}function arpMidi()"
+new="let arpTimer=0,arpStep=0,arpNext=0,arpGatePct=100,arpGateOff=0;function arpGateSet(v){arpGatePct=Math.max(0,Math.min(100,Number(v)||0));arpGateValue.textContent=arpGatePct+'%';if(arpGatePct===0&&gain&&ac)gain.gain.setTargetAtTime(0,ac.currentTime,.005)}function arpXYConfig(){let x=Math.max(-1,Math.min(1,arpPadX)),y=Math.max(-1,Math.min(1,arpPadY));let bpm=Math.round(60+(x+1)*90);let sc=last&&Number.isFinite(+last.scale)?+last.scale:+scale.value;let iv=ARP_INTERVALS[sc]||ARP_INTERVALS[0];let count=Math.max(1,Math.min(iv.length,Math.round(1+(y+1)*.5*(iv.length-1))));return {bpm,count}}function arpMidi()"
 assert old in s,"ARP variable signature missing"
 s=s.replace(old,new,1)
 old="iv[arpStep++%iv.length]"
@@ -48,8 +48,8 @@ new="if(keyHold){px=holdPx;py=holdPy}arpPadX=px;arpPadY=py;gl.uniform2f(U.R,w,h)
 assert old in s,"rendered XY pad signature missing"
 s=s.replace(old,new,1)
 # Do not let the 250ms status poll defeat the GATE note-off envelope.
-old="gain.gain.setTargetAtTime(last.master&&!last.face_down?.09:0,ac.currentTime,.025);if(arpOn&&!arpTimer)"
-new="if(!arpOn)gain.gain.setTargetAtTime(last.master&&!last.face_down?.09:0,ac.currentTime,.025);if(arpOn&&!arpTimer)"
+old="gain.gain.setTargetAtTime(last.master&&!last.face_down?.09:0,ac.currentTime,.025);"
+new="if(!arpOn)gain.gain.setTargetAtTime(last.master&&!last.face_down?.09:0,ac.currentTime,.025);"
 assert old in s,"syncWeb GATE envelope signature missing"
 s=s.replace(old,new,1)
 p.write_text(s,encoding="utf-8")
