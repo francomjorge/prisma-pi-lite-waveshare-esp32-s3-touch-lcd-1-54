@@ -17,6 +17,19 @@ const char prisma_xy_link_web_injection[] =
 "async function setLock(kind,on){try{let r=await fetch('/api/xy/lock?on='+(on?1:0)+'&source='+kind,{method:'POST',cache:'no-store'});if(r.ok)apply(await r.json());else ui();}catch(e){ui();}}"
 "async function sync(){try{let r=await fetch('/api/xy/lock',{cache:'no-store'});if(!r.ok)return;let d=await r.json();if((+d.rev||0)!==state.rev||!!d.locked!==state.locked)apply(d);}catch(e){}}"
 "controls();sync();setInterval(sync,100);"
+"})();"
+"(function(){"
+"let xy=window.PRISMA_FRACTAL_XY||{x:.5,y:.5},phase=0,last=performance.now(),appliedX=0,appliedY=0,baseZoom=null,lastWrittenZoom=null;"
+"let zoomEl=document.getElementById('zoom');if(!zoomEl)return;"
+"function clamp(v,a,b){return v<a?a:(v>b?b:v);}"
+"function activeG01(){return (window.PRISMA_ACTIVE_GENERATOR||'g01')==='g01';}"
+"function readHold(){try{return !!keyHold}catch(e){return false}}"
+"function readSpeed(){try{return Math.max(.2,(+speed.value||100)/100)}catch(e){return 1}}"
+"function restore(){try{baseX-=appliedX;baseY-=appliedY}catch(e){}appliedX=0;appliedY=0;if(baseZoom!==null){zoomEl.value=String(Math.round(clamp(baseZoom,50,235)));lastWrittenZoom=+zoomEl.value;} }"
+"function captureManualZoom(){let z=+zoomEl.value||100;if(lastWrittenZoom===null){baseZoom=z;lastWrittenZoom=z;return}if(Math.abs(z-lastWrittenZoom)>.5){baseZoom=clamp(z,50,235);lastWrittenZoom=z;}}"
+"window.addEventListener('prisma-fractal-xy',function(e){if(e&&e.detail)xy=e.detail;});"
+"function frame(now){requestAnimationFrame(frame);let dt=Math.min(.05,Math.max(0,(now-last)/1000));last=now;let hold=readHold();window.PRISMA_VIDEO_HOLD=hold;captureManualZoom();if(!activeG01()){if(appliedX!==0||appliedY!==0)restore();return;}let fx=clamp((xy.x-.5)*2,-1,1),fy=clamp((.5-xy.y)*2,-1,1),mag=Math.min(1,Math.hypot(fx,fy));if(!hold)phase+=dt*(.65+1.65*mag)*readSpeed();let driftX=hold?0:Math.sin(phase*1.07+fy*.8)*(.11*mag),driftY=hold?0:Math.cos(phase*.83+fx*.7)*(.075*mag);let wantX=fx*.38+driftX,wantY=fy*.26+driftY;try{baseX+=wantX-appliedX;baseY+=wantY-appliedY}catch(e){}appliedX=wantX;appliedY=wantY;if(baseZoom===null)baseZoom=+zoomEl.value||100;let breathe=hold?0:Math.sin(phase*.72)*(.075*mag),factor=Math.exp(fy*.28+breathe),z=clamp(baseZoom*factor,50,235);zoomEl.value=String(Math.round(z));lastWrittenZoom=+zoomEl.value;}"
+"requestAnimationFrame(frame);"
 "})();</script>";
 
 static esp_err_t lock_send(httpd_req_t *r) {
