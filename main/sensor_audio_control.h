@@ -27,6 +27,7 @@ typedef struct {
     bool active;
     bool face_down;
     bool speaker_enabled;
+    bool arp_enabled;
     int volume;
     int voices;
     float pitch_hz;
@@ -51,3 +52,5 @@ const char *prisma_sensor_audio_root_name(int root);
 const char *prisma_sensor_audio_scale_name(prisma_scale_t scale);
 const char *prisma_sensor_audio_waveform_name(prisma_waveform_t waveform);
 void prisma_sensor_audio_get_state(prisma_sensor_audio_state_t *out);
+
+esp_err_t prisma_sensor_audio_set_arp(bool enabled);
