@@ -2,7 +2,7 @@ name: ESP-IDF build
 
 on:
   push:
-    branches: [a4-1-stable-playback-fix]
+    branches: [a4-1-stable-playback-fix, ui-audio-stage1-427]
   workflow_dispatch:
 
 jobs:
