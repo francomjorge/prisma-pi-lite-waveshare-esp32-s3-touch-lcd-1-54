@@ -1,7 +1,7 @@
 from pathlib import Path
 p=Path(__file__).resolve().parents[1]/"main"/"web"/"sensors.html"
 s=p.read_text(encoding="utf-8")
-if "function arpXYConfig()" in s and "function arpGateSet(" in s:
+if "function arpXYConfig()" in s and "function arpGateSet(" in s and "function arpSensorMap(" in s:
     print("audio XY ARP already applied")
     raise SystemExit(0)
 # The Stage1 panel exists by now; append the GATE control next to ARP.
@@ -37,5 +37,22 @@ old="arpState.textContent=arpOn?'ON · 120 BPM':'OFF';"
 new="arpState.textContent=arpOn?'ON · X TEMPO / Y NOTES · SOLO WEB':'OFF · SOLO WEB';"
 assert s.count(old)>=2,"ARP status signatures missing"
 s=s.replace(old,new)
+
+# Use a calibrated, dead-zoned, low-pass sensor mapping for audio only.
+old="let tx=0,ty=0,tz=0,gx=0"
+new="let arpSX=0,arpSY=0,arpCX=null,arpCY=null;function arpSensorMap(ax,ay){if(!Number.isFinite(ax)||!Number.isFinite(ay))return; if(arpCX===null){arpCX=ax;arpCY=ay}const map=(a,c)=>{let d=a-c,sign=Math.sign(d),abs=Math.abs(d);return sign*Math.min(1,Math.max(0,(abs-2)/33))};let x=map(ax,arpCX),y=map(ay,arpCY);arpSX+=.24*(x-arpSX);arpSY+=.24*(y-arpSY);if(Math.abs(arpSX)<.012)arpSX=0;if(Math.abs(arpSY)<.012)arpSY=0}let tx=0,ty=0,tz=0,gx=0"
+assert old in s,"sensor variables signature missing"
+s=s.replace(old,new,1)
+old="tx=Math.max(-1,Math.min(1,d.angle.x/90));ty=Math.max(-1,Math.min(1,d.angle.y/90));"
+new="arpSensorMap(+d.angle.x,+d.angle.y);tx=Math.max(-1,Math.min(1,d.angle.x/90));ty=Math.max(-1,Math.min(1,d.angle.y/90));"
+assert old in s,"sensor polling signature missing"
+s=s.replace(old,new,1)
+# Stage4 XY logic uses its own filtered coordinates, preserving the visual pad's existing mapping.
+s=s.replace("let x=Math.max(-1,Math.min(1,tx)),y=Math.max(-1,Math.min(1,ty));","let x=arpSX,y=arpSY;")
+# Do not let the 250ms status poll defeat the GATE note-off envelope.
+old="gain.gain.setTargetAtTime(last.master&&!last.face_down?.09:0,ac.currentTime,.025);if(arpOn&&!arpTimer)"
+new="if(!arpOn)gain.gain.setTargetAtTime(last.master&&!last.face_down?.09:0,ac.currentTime,.025);if(arpOn&&!arpTimer)"
+assert old in s,"syncWeb GATE envelope signature missing"
+s=s.replace(old,new,1)
 p.write_text(s,encoding="utf-8")
 print("audio XY ARP applied")
