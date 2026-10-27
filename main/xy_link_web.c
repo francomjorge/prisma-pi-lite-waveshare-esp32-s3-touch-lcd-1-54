@@ -7,7 +7,7 @@
 
 const char prisma_xy_link_web_injection[] =
 "<style>"
-".xy-link-controls{margin-top:10px;padding-top:9px;border-top:1px solid #18303d;display:grid;gap:7px}.xy-link-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font:700 10px monospace;letter-spacing:1px;color:#8da8b8}.xy-switch{position:relative;width:42px;height:22px;display:inline-block;flex:0 0 auto}.xy-switch input{opacity:0;width:0;height:0}.xy-switch i{position:absolute;inset:0;border:1px solid #315064;border-radius:20px;background:#0a151d;transition:.18s}.xy-switch i:before{content:'';position:absolute;width:16px;height:16px;left:2px;top:2px;border-radius:50%;background:#7893a3;transition:.18s}.xy-switch input:checked+i{border-color:#28dddd;background:#0b2b30;box-shadow:0 0 8px #28dddd55}.xy-switch input:checked+i:before{transform:translateX(20px);background:#eafcff}.xy-link-state{font:9px monospace;color:#587381;letter-spacing:1px;text-align:center;min-height:11px}.xy-link-controls.linked .xy-link-state{color:#28dddd}"
+".xy-link-controls{margin-top:10px;padding-top:9px;border-top:1px solid #18303d;display:grid;gap:7px}.xy-link-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font:700 10px monospace;letter-spacing:1px;color:#8da8b8}.xy-switch{position:relative;width:42px;height:22px;display:inline-block;flex:0 0 auto}.xy-switch input{opacity:0;width:0;height:0}.xy-switch i{position:absolute;inset:0;border:1px solid #315064;border-radius:20px;background:#0a151d;transition:.18s}.xy-switch i:before{content:'';position:absolute;width:16px;height:16px;left:2px;top:2px;border-radius:50%;background:#7893a3;transition:.18s}.xy-switch input:checked+i{border-color:#28dddd;background:#0b2b30;box-shadow:0 0 8px #28dddd55}.xy-switch input:checked+i:before{transform:translateX(20px);background:#eafcff}.xy-link-state{font:9px monospace;color:#587381;letter-spacing:1px;text-align:center;min-height:11px}.xy-link-controls.linked .xy-link-state{color:#28dddd}.g01-perf{position:absolute;left:10px;top:10px;z-index:5;padding:4px 7px;border:1px solid #22404f;border-radius:10px;background:#041017cc;color:#77e6e6;font:700 10px monospace;pointer-events:none;display:none}"
 "</style><script>(function(){"
 "if(document.documentElement.classList.contains('detached-mode'))return;"
 "const K=['fractal','audio'];let state={locked:false,source:'fractal',rev:0};"
@@ -16,19 +16,19 @@ const char prisma_xy_link_web_injection[] =
 "function apply(d){if(!d)return;state.locked=!!d.locked;state.source=d.source==='audio'?'audio':'fractal';state.rev=+d.rev||state.rev;ui();}"
 "async function setLock(kind,on){try{let r=await fetch('/api/xy/lock?on='+(on?1:0)+'&source='+kind,{method:'POST',cache:'no-store'});if(r.ok)apply(await r.json());else ui();}catch(e){ui();}}"
 "async function sync(){try{let r=await fetch('/api/xy/lock',{cache:'no-store'});if(!r.ok)return;let d=await r.json();if((+d.rev||0)!==state.rev||!!d.locked!==state.locked)apply(d);}catch(e){}}"
-"controls();sync();setInterval(sync,100);"
+"controls();sync();setInterval(sync,250);"
 "})();"
 "(function(){"
-"let xy=window.PRISMA_FRACTAL_XY||{x:.5,y:.5},phase=0,last=performance.now(),appliedX=0,appliedY=0,baseZoom=null,lastWrittenZoom=null;"
-"let zoomEl=document.getElementById('zoom');if(!zoomEl)return;"
+"let xy=window.PRISMA_FRACTAL_XY||{x:.5,y:.5},phase=0,rafLast=performance.now(),stepLast=rafLast,appliedX=0,appliedY=0,baseZoom=null,lastWrittenZoom=null,perfSum=0,perfN=0;"
+"let zoomEl=document.getElementById('zoom'),visualEl=document.getElementById('visual');if(!zoomEl||!visualEl)return;let perf=document.createElement('div');perf.className='g01-perf';perf.textContent='FPS --';visualEl.appendChild(perf);"
 "function clamp(v,a,b){return v<a?a:(v>b?b:v);}"
 "function activeG01(){return (window.PRISMA_ACTIVE_GENERATOR||'g01')==='g01';}"
 "function readHold(){try{return !!keyHold}catch(e){return false}}"
 "function readSpeed(){try{return Math.max(.2,(+speed.value||100)/100)}catch(e){return 1}}"
-"function restore(){try{baseX-=appliedX;baseY-=appliedY}catch(e){}appliedX=0;appliedY=0;if(baseZoom!==null){zoomEl.value=String(Math.round(clamp(baseZoom,50,235)));lastWrittenZoom=+zoomEl.value;} }"
+"function restore(){try{baseX-=appliedX;baseY-=appliedY}catch(e){}appliedX=0;appliedY=0;if(baseZoom!==null){let rz=Math.round(clamp(baseZoom,50,235));if(+zoomEl.value!==rz)zoomEl.value=String(rz);lastWrittenZoom=rz;}}"
 "function captureManualZoom(){let z=+zoomEl.value||100;if(lastWrittenZoom===null){baseZoom=z;lastWrittenZoom=z;return}if(Math.abs(z-lastWrittenZoom)>.5){baseZoom=clamp(z,50,235);lastWrittenZoom=z;}}"
 "window.addEventListener('prisma-fractal-xy',function(e){if(e&&e.detail)xy=e.detail;});"
-"function frame(now){requestAnimationFrame(frame);let dt=Math.min(.05,Math.max(0,(now-last)/1000));last=now;let hold=readHold();window.PRISMA_VIDEO_HOLD=hold;captureManualZoom();if(!activeG01()){if(appliedX!==0||appliedY!==0)restore();return;}let fx=clamp((xy.x-.5)*2,-1,1),fy=clamp((.5-xy.y)*2,-1,1),mag=Math.min(1,Math.hypot(fx,fy));if(!hold)phase+=dt*(.65+1.65*mag)*readSpeed();let driftX=hold?0:Math.sin(phase*1.07+fy*.8)*(.11*mag),driftY=hold?0:Math.cos(phase*.83+fx*.7)*(.075*mag);let wantX=fx*.38+driftX,wantY=fy*.26+driftY;try{baseX+=wantX-appliedX;baseY+=wantY-appliedY}catch(e){}appliedX=wantX;appliedY=wantY;if(baseZoom===null)baseZoom=+zoomEl.value||100;let breathe=hold?0:Math.sin(phase*.72)*(.075*mag),factor=Math.exp(fy*.28+breathe),z=clamp(baseZoom*factor,50,235);zoomEl.value=String(Math.round(z));lastWrittenZoom=+zoomEl.value;}"
+"function frame(now){requestAnimationFrame(frame);let raw=now-rafLast;rafLast=now;if(raw>0&&raw<120){perfSum+=raw;perfN++;if(perfN>=30){let fps=1000/(perfSum/perfN);perf.textContent='FPS '+fps.toFixed(0);perfSum=0;perfN=0;}}let on=activeG01();perf.style.display=on?'block':'none';if(now-stepLast<32)return;let dt=Math.min(.08,Math.max(0,(now-stepLast)/1000));stepLast=now;let hold=readHold();window.PRISMA_VIDEO_HOLD=hold;captureManualZoom();if(!on){if(appliedX!==0||appliedY!==0)restore();return;}let fx=clamp((xy.x-.5)*2,-1,1),fy=clamp((.5-xy.y)*2,-1,1),mag=Math.min(1,Math.hypot(fx,fy));if(!hold)phase+=dt*(.65+1.65*mag)*readSpeed();let driftX=hold?0:Math.sin(phase*1.07+fy*.8)*(.11*mag),driftY=hold?0:Math.cos(phase*.83+fx*.7)*(.075*mag);let wantX=fx*.38+driftX,wantY=fy*.26+driftY;try{baseX+=wantX-appliedX;baseY+=wantY-appliedY}catch(e){}appliedX=wantX;appliedY=wantY;if(baseZoom===null)baseZoom=+zoomEl.value||100;let breathe=hold?0:Math.sin(phase*.72)*(.075*mag),factor=Math.exp(fy*.28+breathe),z=Math.round(clamp(baseZoom*factor,50,235));if(+zoomEl.value!==z){zoomEl.value=String(z);lastWrittenZoom=z;}}"
 "requestAnimationFrame(frame);"
 "})();</script>";
 
