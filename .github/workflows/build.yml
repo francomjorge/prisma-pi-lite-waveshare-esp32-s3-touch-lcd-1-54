@@ -5,7 +5,7 @@ on:
     branches: [a4-1-stable-playback-fix, ui-audio-stage1-427, audio-stage2-arp-428, audio-stage3-appliance-arp-430]
   workflow_dispatch:
 
-# Stage 3 build trigger: appliance ARP integration checkpoint.
+# Stage 3 build trigger: appliance ARP integration checkpoint (retry 2).
 
 jobs:
   build:
