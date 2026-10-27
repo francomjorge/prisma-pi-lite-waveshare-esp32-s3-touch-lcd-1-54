@@ -1,28 +1,64 @@
 #include "xy_link_web.h"
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "xy_control.h"
 
 const char prisma_xy_link_web_injection[] =
 "<style>"
-".xy-link-controls{margin-top:10px;padding-top:9px;border-top:1px solid #18303d;display:grid;gap:7px}.xy-link-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font:700 10px monospace;letter-spacing:1px;color:#8da8b8}.xy-link-row.random{display:none}.xy-link-controls.linked .xy-link-row.random{display:flex}.xy-switch{position:relative;width:42px;height:22px;display:inline-block;flex:0 0 auto}.xy-switch input{opacity:0;width:0;height:0}.xy-switch i{position:absolute;inset:0;border:1px solid #315064;border-radius:20px;background:#0a151d;transition:.18s}.xy-switch i:before{content:'';position:absolute;width:16px;height:16px;left:2px;top:2px;border-radius:50%;background:#7893a3;transition:.18s}.xy-switch input:checked+i{border-color:#28dddd;background:#0b2b30;box-shadow:0 0 8px #28dddd55}.xy-switch input:checked+i:before{transform:translateX(20px);background:#eafcff}.xy-link-state{font:9px monospace;color:#587381;letter-spacing:1px;text-align:center;min-height:11px}.xy-link-controls.linked .xy-link-state{color:#28dddd}"
+".xy-link-controls{margin-top:10px;padding-top:9px;border-top:1px solid #18303d;display:grid;gap:7px}.xy-link-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font:700 10px monospace;letter-spacing:1px;color:#8da8b8}.xy-switch{position:relative;width:42px;height:22px;display:inline-block;flex:0 0 auto}.xy-switch input{opacity:0;width:0;height:0}.xy-switch i{position:absolute;inset:0;border:1px solid #315064;border-radius:20px;background:#0a151d;transition:.18s}.xy-switch i:before{content:'';position:absolute;width:16px;height:16px;left:2px;top:2px;border-radius:50%;background:#7893a3;transition:.18s}.xy-switch input:checked+i{border-color:#28dddd;background:#0b2b30;box-shadow:0 0 8px #28dddd55}.xy-switch input:checked+i:before{transform:translateX(20px);background:#eafcff}.xy-link-state{font:9px monospace;color:#587381;letter-spacing:1px;text-align:center;min-height:11px}.xy-link-controls.linked .xy-link-state{color:#28dddd}"
 "</style><script>(function(){"
 "if(document.documentElement.classList.contains('detached-mode'))return;"
-"const K=['fractal','audio'],other=k=>k==='fractal'?'audio':'fractal';"
-"let locked=false,randomized=false,master=null,coord={fractal:{x:.5,y:.5},audio:{x:.5,y:.5}},rev={fractal:0,audio:0},drag={fractal:false,audio:false},last={fractal:null,audio:null},suppress={fractal:null,audio:null};"
-"let vel={x:0,y:0},wander={x:0,y:0,tx:0,ty:0,next:0},lastPost=0,raf=0;"
-"function clamp(v){return Math.max(0,Math.min(1,v))}"
-"function paint(k,p){coord[k]={x:clamp(p.x),y:clamp(p.y)};let pad=document.getElementById('xy-'+k),dot=pad&&pad.querySelector('.xy-dot');if(dot){dot.style.left=(coord[k].x*100)+'%';dot.style.top=(coord[k].y*100)+'%';}if(k==='fractal'){window.PRISMA_FRACTAL_XY={x:coord[k].x,y:coord[k].y};window.dispatchEvent(new CustomEvent('prisma-fractal-xy',{detail:window.PRISMA_FRACTAL_XY}));}}"
-"function write(k,p){let q={x:clamp(p.x),y:clamp(p.y)};paint(k,q);suppress[k]={x:q.x,y:q.y,until:performance.now()+350};fetch('/api/xy/'+k+'?x='+q.x.toFixed(5)+'&y='+q.y.toFixed(5),{method:'POST',cache:'no-store'}).catch(function(){});}"
-"function same(a,b){return a&&Math.abs(a.x-b.x)<.003&&Math.abs(a.y-b.y)<.003}"
-"function controls(){K.forEach(function(k){let pad=document.getElementById('xy-'+k),box=pad&&pad.closest('.xy-box');if(!box||box.querySelector('.xy-link-controls'))return;let c=document.createElement('div');c.className='xy-link-controls';c.dataset.kind=k;c.innerHTML='<div class=\"xy-link-row\"><span>LOCK X/Y</span><label class=\"xy-switch\"><input type=\"checkbox\" class=\"xy-lock\"><i></i></label></div><div class=\"xy-link-row random\"><span>RANDOMIZE</span><label class=\"xy-switch\"><input type=\"checkbox\" class=\"xy-random\"><i></i></label></div><div class=\"xy-link-state\">INDEPENDENT</div>';box.appendChild(c);c.querySelector('.xy-lock').addEventListener('change',function(){setLock(k,this.checked)});c.querySelector('.xy-random').addEventListener('change',function(){setRandom(this.checked)});});ui();}"
-"function ui(){document.querySelectorAll('.xy-link-controls').forEach(function(c){c.classList.toggle('linked',locked);let l=c.querySelector('.xy-lock'),r=c.querySelector('.xy-random'),s=c.querySelector('.xy-link-state');if(l)l.checked=locked;if(r)r.checked=locked&&randomized;if(s)s.textContent=!locked?'INDEPENDENT':(randomized?'LINKED · RANDOM':'LINKED · MIRROR');});}"
-"function exactFrom(src){let dst=other(src);write(dst,coord[src]);last[src]={...coord[src]};vel.x=vel.y=0;}"
-"function setLock(src,on){if(!on){locked=false;randomized=false;master=null;vel.x=vel.y=0;ui();return;}locked=true;randomized=false;master=src;exactFrom(src);ui();}"
-"function setRandom(on){if(!locked)return;randomized=!!on;if(!master)master='fractal';last[master]={...coord[master]};vel.x=vel.y=0;wander.x=wander.y=0;wander.tx=Math.random()*2-1;wander.ty=Math.random()*2-1;wander.next=performance.now()+600+Math.random()*900;if(!randomized)exactFrom(master);ui();if(randomized)startLoop();}"
-"function makeMaster(k){if(!locked)return;if(master!==k){master=k;vel.x=vel.y=0;}last[k]={...coord[k]};if(randomized)startLoop();}"
-"function drive(k,p){paint(k,p);if(!locked)return;if(master!==k)makeMaster(k);let prev=last[k]||coord[k],dx=p.x-prev.x,dy=p.y-prev.y;last[k]={x:p.x,y:p.y};if(!randomized){write(other(k),p);return;}let a=.55*(wander.x-wander.y),ca=Math.cos(a),sa=Math.sin(a),rx=dx*ca-dy*sa,ry=dx*sa+dy*ca;vel.x=vel.x*.62+rx*(.75+.35*Math.abs(wander.x));vel.y=vel.y*.62+ry*(.75+.35*Math.abs(wander.y));startLoop();}"
-"function randLoop(t){raf=0;if(!locked||!randomized||!master)return;if(t>wander.next){wander.tx=Math.random()*2-1;wander.ty=Math.random()*2-1;wander.next=t+650+Math.random()*1150;}wander.x+=(wander.tx-wander.x)*.018;wander.y+=(wander.ty-wander.y)*.018;vel.x*=.955;vel.y*=.955;let dst=other(master),p=coord[dst],m=coord[master],nx=p.x+vel.x*.22+wander.x*.00075,ny=p.y+vel.y*.22+wander.y*.00075,dx=nx-m.x,dy=ny-m.y,d=Math.hypot(dx,dy);if(d<.055){let px=-dy,py=dx,n=Math.hypot(px,py)||1;nx+=px/n*.0035;ny+=py/n*.0035;}if(nx<.015||nx>.985){vel.x*=-.7;wander.tx*=-1}if(ny<.015||ny>.985){vel.y*=-.7;wander.ty*=-1}let q={x:Math.max(.01,Math.min(.99,nx)),y:Math.max(.01,Math.min(.99,ny))};paint(dst,q);if(t-lastPost>48){lastPost=t;suppress[dst]={x:q.x,y:q.y,until:t+350};fetch('/api/xy/'+dst+'?x='+q.x.toFixed(5)+'&y='+q.y.toFixed(5),{method:'POST',cache:'no-store'}).catch(function(){});}raf=requestAnimationFrame(randLoop);}"
-"function startLoop(){if(!raf)raf=requestAnimationFrame(randLoop)}"
-"function pos(e,p){let r=p.getBoundingClientRect();return{x:clamp((e.clientX-r.left)/r.width),y:clamp((e.clientY-r.top)/r.height)}}"
-"K.forEach(function(k){let p=document.getElementById('xy-'+k);if(!p)return;p.addEventListener('pointerdown',function(e){drag[k]=true;if(locked)makeMaster(k);drive(k,pos(e,p));});p.addEventListener('pointermove',function(e){if(drag[k])drive(k,pos(e,p));});function up(){drag[k]=false}p.addEventListener('pointerup',up);p.addEventListener('pointercancel',up);});"
-"async function poll(k){try{let r=await fetch('/api/xy/'+k,{cache:'no-store'});if(!r.ok)return;let d=await r.json(),p={x:+d.x,y:+d.y};if(d.rev===rev[k])return;rev[k]=d.rev;paint(k,p);let s=suppress[k],self=s&&performance.now()<s.until&&same(s,p);if(self){suppress[k]=null;return;}if(locked&&!drag[k])drive(k,p);}catch(e){}}"
-"controls();K.forEach(poll);setInterval(function(){K.forEach(poll)},50);"
+"const K=['fractal','audio'];let state={locked:false,source:'fractal',rev:0};"
+"function controls(){K.forEach(function(k){let pad=document.getElementById('xy-'+k),box=pad&&pad.closest('.xy-box');if(!box||box.querySelector('.xy-link-controls'))return;let c=document.createElement('div');c.className='xy-link-controls';c.dataset.kind=k;c.innerHTML='<div class=\"xy-link-row\"><span>LOCK X/Y</span><label class=\"xy-switch\"><input type=\"checkbox\" class=\"xy-lock\"><i></i></label></div><div class=\"xy-link-state\">INDEPENDENT</div>';box.appendChild(c);c.querySelector('.xy-lock').addEventListener('change',function(){setLock(k,this.checked)});});ui();}"
+"function ui(){document.querySelectorAll('.xy-link-controls').forEach(function(c){c.classList.toggle('linked',state.locked);let l=c.querySelector('.xy-lock'),s=c.querySelector('.xy-link-state');if(l)l.checked=state.locked;if(s)s.textContent=state.locked?'LINKED · MIRROR':'INDEPENDENT';});}"
+"function apply(d){if(!d)return;state.locked=!!d.locked;state.source=d.source==='audio'?'audio':'fractal';state.rev=+d.rev||state.rev;ui();}"
+"async function setLock(kind,on){try{let r=await fetch('/api/xy/lock?on='+(on?1:0)+'&source='+kind,{method:'POST',cache:'no-store'});if(r.ok)apply(await r.json());else ui();}catch(e){ui();}}"
+"async function sync(){try{let r=await fetch('/api/xy/lock',{cache:'no-store'});if(!r.ok)return;let d=await r.json();if((+d.rev||0)!==state.rev||!!d.locked!==state.locked)apply(d);}catch(e){}}"
+"controls();sync();setInterval(sync,100);"
 "})();</script>";
+
+static esp_err_t lock_send(httpd_req_t *r) {
+    prisma_xy_lock_state_t s;
+    prisma_xy_lock_get(&s);
+    char b[128];
+    snprintf(b, sizeof(b), "{\"locked\":%s,\"source\":\"%s\",\"rev\":%u}",
+             s.locked ? "true" : "false",
+             s.source == PRISMA_XY_AUDIO ? "audio" : "fractal",
+             (unsigned)s.rev);
+    httpd_resp_set_type(r, "application/json");
+    httpd_resp_set_hdr(r, "Cache-Control", "no-store");
+    return httpd_resp_sendstr(r, b);
+}
+
+static bool query_value(httpd_req_t *r, const char *key, char *out, size_t out_len) {
+    char q[160];
+    if (httpd_req_get_url_query_str(r, q, sizeof(q)) != ESP_OK) return false;
+    return httpd_query_key_value(q, key, out, out_len) == ESP_OK;
+}
+
+static esp_err_t lock_get(httpd_req_t *r) {
+    return lock_send(r);
+}
+
+static esp_err_t lock_post(httpd_req_t *r) {
+    char on[12] = {0};
+    char source[20] = {0};
+    bool has_on = query_value(r, "on", on, sizeof(on));
+    query_value(r, "source", source, sizeof(source));
+    if (has_on) {
+        bool enabled = atoi(on) != 0;
+        prisma_xy_channel_t src = strcmp(source, "audio") == 0 ? PRISMA_XY_AUDIO : PRISMA_XY_FRACTAL;
+        prisma_xy_lock_set(enabled, src);
+    }
+    return lock_send(r);
+}
+
+void prisma_xy_link_http_register(httpd_handle_t server) {
+    if (!server) return;
+    httpd_uri_t lg = {.uri="/api/xy/lock", .method=HTTP_GET, .handler=lock_get};
+    httpd_uri_t lp = {.uri="/api/xy/lock", .method=HTTP_POST, .handler=lock_post};
+    httpd_register_uri_handler(server, &lg);
+    httpd_register_uri_handler(server, &lp);
+}
