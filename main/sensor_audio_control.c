@@ -10,7 +10,7 @@
 #include "freertos/task.h"
 
 static SemaphoreHandle_t s_lock;
-static prisma_sensor_audio_state_t s={.enabled=false,.active=false,.face_down=false,.speaker_enabled=true,.volume=100,.voices=1,.pitch_hz=440.0f,.root=9,.scale=PRISMA_SCALE_CHROMATIC,.waveform=PRISMA_WAVE_SINE,.midi_note=69,.note_name="A4"};
+static prisma_sensor_audio_state_t s={.enabled=false,.active=false,.face_down=false,.speaker_enabled=true,.arp_enabled=false,.volume=100,.voices=1,.pitch_hz=440.0f,.root=9,.scale=PRISMA_SCALE_CHROMATIC,.waveform=PRISMA_WAVE_SINE,.midi_note=69,.note_name="A4"};
 static TaskHandle_t s_task;
 static const char *NOTE[12]={"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 static const char *SCALE_NAMES[PRISMA_SCALE_COUNT]={"CHROMATIC","MAJOR","MINOR","DIMINISHED","DORIAN","WHOLE TONE"};
@@ -40,3 +40,5 @@ esp_err_t prisma_sensor_audio_set_scale(prisma_scale_t scale){if(scale<0||scale>
 esp_err_t prisma_sensor_audio_set_waveform(prisma_waveform_t wave){if(wave<0||wave>=PRISMA_WAVE_COUNT)return ESP_ERR_INVALID_ARG;if(!s_lock)return ESP_ERR_INVALID_STATE;prisma_audio_sensor_tone_set_waveform((int)wave);xSemaphoreTake(s_lock,portMAX_DELAY);s.waveform=wave;xSemaphoreGive(s_lock);return ESP_OK;}
 esp_err_t prisma_sensor_audio_set_speaker(bool enabled){if(!s_lock)return ESP_ERR_INVALID_STATE;esp_err_t e=prisma_audio_set_speaker_enabled(enabled);if(e==ESP_OK){xSemaphoreTake(s_lock,portMAX_DELAY);s.speaker_enabled=enabled;xSemaphoreGive(s_lock);}return e;}
 void prisma_sensor_audio_get_state(prisma_sensor_audio_state_t *out){if(!out)return;if(!s_lock){*out=s;return;}xSemaphoreTake(s_lock,portMAX_DELAY);*out=s;xSemaphoreGive(s_lock);}
+
+esp_err_t prisma_sensor_audio_set_arp(bool enabled){if(!s_lock)return ESP_ERR_INVALID_STATE;xSemaphoreTake(s_lock,portMAX_DELAY);s.arp_enabled=enabled;xSemaphoreGive(s_lock);return ESP_OK;}
