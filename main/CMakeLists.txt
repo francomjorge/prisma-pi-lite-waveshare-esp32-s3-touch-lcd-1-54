@@ -1,3 +1,12 @@
+execute_process(
+    COMMAND ${PYTHON} ${CMAKE_CURRENT_LIST_DIR}/../tools/patch_audio_stage1.py
+    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/..
+    RESULT_VARIABLE PRISMA_AUDIO_UI_PATCH_RESULT
+)
+if(NOT PRISMA_AUDIO_UI_PATCH_RESULT EQUAL 0)
+    message(FATAL_ERROR "PRISMA audio stage1 UI patch failed")
+endif()
+
 idf_component_register(
     SRCS "app_factory_v1.c" "wifi_portal_factory.c" "network_service.c" "security_service.c" "files_plus_api.c" "playback_http.c" "audio_service.c" "audio_api.c" "prisma_touch.c" "prisma_sensors.c" "sensor_audio_control.c" "sensors_web.c" "xy_control.c" "xy_http.c" "xy_link_web.c" "storage.c" "prisma_power.c" "prisma_metrics.c" "admin_api_v2.c"
     INCLUDE_DIRS "."
