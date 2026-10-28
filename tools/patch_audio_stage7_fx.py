@@ -17,6 +17,8 @@ prismaReverb=ac.createConvolver();let sr=ac.sampleRate,len=Math.floor(sr*1.1),bu
 function prismaFxUpdate(){if(!ac||!prismaDelayWet||!prismaReverbWet)return;let y=latest&&latest.angle?Number(latest.angle.y):0;if(!Number.isFinite(y))y=0;let amount=Math.min(1,Math.max(0,(Math.abs(y)-8)/55));let mode=y>8?'DELAY':y< -8?'REVERB':'DRY';if(!arpOn||!webOn)mode='DRY';prismaDelayWet.gain.setTargetAtTime(mode==='DELAY'?.35*amount:0,ac.currentTime,.09);prismaReverbWet.gain.setTargetAtTime(mode==='REVERB'?.45*amount:0,ac.currentTime,.09);let label=document.getElementById('prismaFxStatus');if(label)label.textContent=mode+' '+Math.round(amount*100)+'%'}
 function unlockWebAudio(){""")
 rep("last=d.beep;if(arpOn){","last=d.beep;prismaFxUpdate();if(arpOn){")
-rep('<button id="web" onclick="toggleWeb()">WEB AUDIO OFF</button>','<button id="web" onclick="toggleWeb()">WEB AUDIO OFF</button><span id="prismaFxStatus" style="font:11px monospace">FX DRY</span>')
+rep('id="web" onclick="toggleWeb()"','id="web" onclick="toggleWeb()"')
+# Add status near known control via robust idempotent markup replacement.
+rep('<button id="web" onclick="toggleWeb()"','<span id="prismaFxStatus" style="font:11px monospace">FX DRY</span><button id="web" onclick="toggleWeb()"')
 p.write_text(s,encoding="utf-8")
 print("stage7 browser-only IMU Y reverb/delay applied; visual untouched")
